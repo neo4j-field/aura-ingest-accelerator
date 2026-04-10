@@ -1,0 +1,2 @@
+# Developer requirements — managed via pyproject.toml [project.optional-dependencies]
+# Install with: uv pip install -e .[dev]

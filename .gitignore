@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+*_env/
+.venv/
+venv/
+env/
+
+# Secrets / environment
+.env
+*.env.*
+!.env.example
+
+# Output / generated artifacts
+output/
+!output/.gitkeep
+
+# Testing
+.pytest_cache/
+coverage.xml
+htmlcov/
+.coverage
+
+# IDE / editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# OneDrive / temp
+~$*
+*.tmp
+
+# Activation helpers
+activate_env.sh
+activate_env.ps1
