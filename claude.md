@@ -1,25 +1,6 @@
 <!-- AUTO-GENERATED: base + modules[neo4j] -->
-<!-- Do not edit above ## Project-Specific — run refresh-claude.sh to update -->
-<!-- dev-standards: https://github.com/pdrangeid/dev-standards -->
+<!-- Do not edit above ## Project-Specific -->
 
-# Claude Standards: Base Python Conventions
-
-This file encodes universal patterns and conventions for all Python projects
-in this ecosystem. It is auto-fetched by `setup-project.sh` and `refresh-claude.sh`.
-
----
-
-## Project Ecosystem Overview
-
-These tools form a **Manifest-First, graph-generation pipeline**:
-
-```
-[Analyzers / Parsers]
-    ↓  JSON Manifest (Source of Truth)
-[Strategic Exporter / Schema Mapper]
-    ↓  Cypher (.cypher files) + LLM-ready analysis
-[Neo4j Knowledge Graph]
-```
 
 ---
 
@@ -177,7 +158,7 @@ Keep this lightweight — one short prompt, not an interrogation.
 
 ### Session Continuity
 - This `claude.md` is the shared contract across sessions — reference it at the start of any new coding session
-- If a parallel session (e.g., schema mapper overhaul) produces new conventions, update this file before continuing in other sessions
+- If a parallel session  produces new conventions, update this file before continuing in other sessions
 
 ### GitHub Workflow
 - Standard branch-per-feature workflow assumed
@@ -224,7 +205,6 @@ and constraint management for all projects that write to or read from Neo4j.
   ON MATCH SET n.modifiedEpochMillis = now, n.modifiedDatetime = datetime(now)
   SET n.property = 'value';
   ```
-- All string values escaped via `_escape()` — never f-string raw user data directly into Cypher
 - Timestamps: use `datetime('ISO8601_STRING')` format, UTC by default
 - Session timestamp passed into exporter at construction time — never generated mid-export
 - Use `IF NOT EXISTS` on all `CREATE CONSTRAINT` and `CREATE INDEX` statements
@@ -337,8 +317,6 @@ and constraint management for all projects that write to or read from Neo4j.
 ## Project-Specific
 
 > This section is maintained by Claude during coding sessions.
-> Run `refresh-claude.sh` to update the auto-generated sections above
-> without touching anything below this line.
 
 ### Overview
 _To be filled in during first Claude Code session._

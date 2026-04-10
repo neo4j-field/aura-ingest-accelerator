@@ -13,21 +13,19 @@ requires-python = ">=3.11"
 #   { name = "Paul Drangeid", email = "pdrangeid@gmail.com" },
 # ]
 dependencies = [
+    "neo4j>=5.0.0",
+    "python-dotenv>=1.0.0",
+    "google-cloud-bigquery>=3.0.0",
+    "google-cloud-storage>=2.0.0",
     "typer>=0.9.0",
-    "rich>=13.0,<14.0",
-    # Add further runtime dependencies here, e.g.:
-    # "requests>=2.25.0",
+    "rich>=13.0.0"
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-cov",
-    "black",
-    "ruff",
-    "pip-tools",
-    # "python-dotenv",
-    # "mypy",
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0"
 ]
 
 [project.scripts]
