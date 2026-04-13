@@ -1,50 +1,15 @@
 # main.py
+import yaml
 from importer import Neo4jImporter
 from sources.bigquery_source import BigQuerySource
-from sources.gcs_source import GCSSource  # FIX: was missing
+from sources.gcs_source import GCSSource
 
 
 # =============================================================================
-# Cypher Queries
+# Optional transform functions
 # =============================================================================
-#
-# All queries use the UNWIND $rows AS row pattern.
-# The importer passes each batch as {"rows": [...]}.
-#
-# NODE_QUERY note: the final SET outside ON CREATE / ON MATCH intentionally
-# overwrites name and email on every run. Move those properties into ON CREATE
-# only if you want them written once and never updated.
-# =============================================================================
-
-NODE_QUERY = """
-UNWIND $rows AS row
-WITH row, datetime() AS now
-MERGE (p:ClientNode {id: row.id})
-ON CREATE SET
-  p.createdAt = now,
-  p.updatedAt = now
-ON MATCH SET
-  p.updatedAt = now
-SET p.name = row.name, p.email = row.email
-"""
-
-REL_QUERY = """
-UNWIND $rows AS row
-MATCH (a:ClientNode {id: row.source_id})
-MATCH (b:ClientNode {id: row.target_id})
-MERGE (a)-[r:INTERACTED_WITH]->(b)
-ON CREATE SET r.timestamp = datetime(row.ts)
-"""
-
-SUPPLIER_QUERY = """
-UNWIND $rows AS row
-MERGE (d:Supplier {supplierCode: row.code})
-SET d.name = row.name, d.location = row.city
-"""
-
-
-# =============================================================================
-# Transform Functions
+# Map a transform function name (as used in config.yaml) to a callable.
+# Return None to skip a row; otherwise return the (modified) row dict.
 # =============================================================================
 
 def transform_part_row(row: dict) -> dict | None:
@@ -56,13 +21,9 @@ def transform_part_row(row: dict) -> dict | None:
       - 'partnum' is normalized to uppercase.
       - 'is_active' boolean is derived from the 'status' field.
       - A static 'import_source' tag is added for lineage tracking.
-
-    To use:
-        importer.run_import(source, NODE_QUERY, transform_fn=transform_part_row)
     """
     if not row.get("partnum"):
-        return None  # Returning None signals the importer to skip this row
-
+        return None
     return {
         **row,
         "partnum": row["partnum"].upper(),
@@ -71,43 +32,51 @@ def transform_part_row(row: dict) -> dict | None:
     }
 
 
+# Register transforms here — key must match 'transform' value in config.yaml
+TRANSFORMS = {
+    "transform_part_row": transform_part_row,
+}
+
+
 # =============================================================================
-# Import Runs
+# Source factory
 # =============================================================================
 
-def run_poc():
-    # Use as a context manager so the driver is always cleanly closed,
-    # even if an exception occurs mid-import.
+def build_source(cfg: dict):
+    source_type = cfg.get("source")
+    if source_type == "bigquery":
+        return BigQuerySource(cfg["query"])
+    elif source_type == "gcs":
+        return GCSSource(bucket_name=cfg["bucket"], blob_name=cfg["blob"])
+    else:
+        raise ValueError(
+            f"Unknown source type '{source_type}'. "
+            f"Valid options: bigquery, gcs"
+        )
+
+
+# =============================================================================
+# Config-driven import runner
+# =============================================================================
+
+def run_poc(config_path: str = "config.yaml"):
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+
     with Neo4jImporter() as importer:
+        for job in config.get("imports", []):
+            name = job.get("name", "Unnamed")
+            print(f"\n--- {name} ---")
 
-        # --- Node Import from BigQuery ---
-        print("--- Importing Nodes ---")
-        bq_nodes = BigQuerySource(
-            "SELECT id, name, email FROM `poc-project.dataset.users` LIMIT 5000"
-        )
-        importer.run_import(bq_nodes, NODE_QUERY, batch_size=1000)
+            source = build_source(job)
+            transform_fn = TRANSFORMS.get(job.get("transform"))  # None if not specified
 
-        # --- Relationship Import from BigQuery ---
-        # Lower batch size for relationship writes — each batch requires two
-        # MATCH lookups per row, so smaller batches reduce lock contention.
-        print("\n--- Importing Relationships ---")
-        bq_rels = BigQuerySource(
-            "SELECT source_id, target_id, ts FROM `poc-project.dataset.edges` LIMIT 2000"
-        )
-        importer.run_import(bq_rels, REL_QUERY, batch_size=100)
-
-        # --- GCS CSV Import with inline transform ---
-        print("\n--- Importing Suppliers from GCS ---")
-        gcs_source = GCSSource(
-            bucket_name="my-data-landing",
-            blob_name="test_data_2026.csv",
-        )
-        importer.run_import(
-            source=gcs_source,
-            cypher_query=SUPPLIER_QUERY,
-            batch_size=500,
-            transform_fn=lambda r: {**r, "name": r["name"].strip()},
-        )
+            importer.run_import(
+                source=source,
+                cypher_query=job["cypher"],
+                batch_size=job.get("batch_size", 1000),
+                transform_fn=transform_fn,
+            )
 
 
 if __name__ == "__main__":
