@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aura-ingest-accelerator"
+version = "0.1.0"
+description = "A modular Python-based ingestion framework designed for rapid Neo4j Aura prototyping. This library provides a scalable quick-start alternative to distributed ETL jobs, allowing for secure, high-performance data loading from GCS and BigQuery within VPC environments. Features include batch-optimized Cypher execution, pre-load data transformations, modular datasources"
+readme = "README.md"
+requires-python = ">=3.11"
+# license = { text = "MIT" }
+# authors = [
+#   { name = "Paul Drangeid", email = "pdrangeid@gmail.com" },
+# ]
+dependencies = [
+    "neo4j>=5.0.0",
+    "python-dotenv>=1.0.0",
+    "google-cloud-bigquery>=3.0.0",
+    "google-cloud-storage>=2.0.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0"
+]
+
+[project.scripts]
+# Uncomment after defining your CLI entry point:
+# aura_ingest_accelerator = "aura_ingest_accelerator.main:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aura_ingest_accelerator*"]
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = []
+target-version = "py311"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --cov=aura_ingest_accelerator --cov-report=html --cov-report=xml"
+testpaths = ["tests"]
+python_files = "test_*.py *_test.py tests.py"
