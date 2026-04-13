@@ -1,0 +1,48 @@
+# config.yaml
+# =============================================================================
+# POC Import Configuration
+# =============================================================================
+# Edit this file to match your data sources and target graph model.
+# Credentials stay in .env — this file is safe to commit.
+# =============================================================================
+
+imports:
+
+  - name: "Client Nodes"
+    source: bigquery
+    query: >
+      SELECT id, name, email
+      FROM `your-project.your-dataset.users`
+      LIMIT 5000
+    cypher: |
+      UNWIND $rows AS row
+      WITH row, datetime() AS now
+      MERGE (p:ClientNode {id: row.id})
+      ON CREATE SET p.createdAt = now, p.updatedAt = now
+      ON MATCH SET  p.updatedAt = now
+      SET p.name = row.name, p.email = row.email
+    batch_size: 1000
+
+  - name: "Interactions"
+    source: bigquery
+    query: >
+      SELECT source_id, target_id, ts
+      FROM `your-project.your-dataset.edges`
+      LIMIT 2000
+    cypher: |
+      UNWIND $rows AS row
+      MATCH (a:ClientNode {id: row.source_id})
+      MATCH (b:ClientNode {id: row.target_id})
+      MERGE (a)-[r:INTERACTED_WITH]->(b)
+      ON CREATE SET r.timestamp = datetime(row.ts)
+    batch_size: 100
+
+  - name: "Suppliers"
+    source: gcs
+    bucket: "my-data-landing"
+    blob: "test_data_2026.csv"
+    cypher: |
+      UNWIND $rows AS row
+      MERGE (d:Supplier {supplierCode: row.code})
+      SET d.name = row.name, d.location = row.city
+    batch_size: 500

@@ -16,6 +16,7 @@ A lightweight, modular batch import toolkit for getting data into AuraDB quickly
 │   ├── base.py                  # BaseSource ABC — extend this for new sources
 │   ├── bigquery_source.py       # Stream rows from a BigQuery query
 │   └── gcs_source.py            # Stream rows from a GCS CSV file
+├── config.yaml                  # All import jobs — queries, Cypher, batch 
 ├── env.sample                   # Copy to .env and fill in your values
 └── .gitignore
 ```
@@ -71,36 +72,66 @@ python main.py
 
 ## How It Works
 
+### Configuration
+
+All import jobs are defined in config.yaml — queries, Cypher, source details, and batch sizes. Credentials stay in .env. This is the only file customers need to edit for a typical POC.
+
+```yaml
+yamlimports:
+  - name: "Client Nodes"
+    source: bigquery
+    query: >
+      SELECT id, name, email FROM `your-project.your-dataset.users`
+    cypher: |
+      UNWIND $rows AS row
+      MERGE (p:ClientNode {id: row.id})
+      SET p.name = row.name
+    batch_size: 1000
+```
+
+Each job entry supports:
+| Key | Required | Description |
+|---|---|---|
+name | - | for logging output
+source |✅ |bigquery or gcs
+query | ✅ |(BigQuery)Standard SQL query
+bucket / blob| ✅ |(GCS)GCS bucket name and file path
+cypher |✅ |Cypher using UNWIND $rows AS row
+batch_size | — | Rows per transaction (default: 1000)
+transform | — | Name of a transform function defined in main.py
+
 ### The Importer
 
 `Neo4jImporter` handles the connection, batching, retries, and summary logging. All your Cypher queries use the `UNWIND $rows AS row` pattern — the importer passes each batch as `{"rows": [...]}`.
 
 ```python
-from importer import Neo4jImporter
-from sources.bigquery_source import BigQuerySource
+f# Run all jobs defined in config.yaml
+python main.py
 
-CYPHER = """
-UNWIND $rows AS row
-MERGE (p:Person {id: row.id})
-SET p.name = row.name
-"""
-
-with Neo4jImporter() as importer:
-    source = BigQuerySource("SELECT id, name FROM `project.dataset.table`")
-    importer.run_import(source, CYPHER, batch_size=1000)
+# Or point at a different config file
+from main import run_poc
+run_poc("config_staging.yaml")
 ```
 
 ### Adding a Transform
 
-Pass a `transform_fn` to clean, filter, or enrich rows before they're written. Return `None` to skip a row:
+Define a function in main.py, register it in the TRANSFORMS dict, then reference it by name in config.yaml:
+
+```yaml
+- name: "Parts"
+  source: gcs
+  transform: transform_part_row
+  ...
+```
 
 ```python
-def clean_row(row):
-    if not row.get("id"):
+# main.py
+def transform_part_row(row):
+    if not row.get("partnum"):
         return None  # skip rows with no ID
-    return {**row, "name": row["name"].strip().upper()}
+    return {**row, "partnum": row["partnum"].upper()}
 
-importer.run_import(source, CYPHER, transform_fn=clean_row)
+TRANSFORMS = {"transform_part_row": transform_part_row}
 ```
 
 ### Adding a New Data Source
