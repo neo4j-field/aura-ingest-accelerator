@@ -27,6 +27,9 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0"
 ]
+hmac = [
+    "boto3>=1.26.0"
+]
 
 [project.scripts]
 # Uncomment after defining your CLI entry point:

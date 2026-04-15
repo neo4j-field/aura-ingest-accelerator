@@ -319,10 +319,46 @@ and constraint management for all projects that write to or read from Neo4j.
 > This section is maintained by Claude during coding sessions.
 
 ### Overview
-_To be filled in during first Claude Code session._
+
+Modular Python ingestion framework for loading data into Neo4j Aura from GCS (CSV)
+and BigQuery. Core components: `Neo4jImporter` (batch Cypher execution with retry),
+`GCSSource` / `BigQuerySource` (streaming data sources), and a config-driven runner
+in `main.py` that wires sources, transforms, and Cypher together from `config.yaml`.
 
 ### Key Patterns
-_Document project-specific conventions, quirks, and decisions here._
+
+**GCSSource — two auth paths, zero code difference at call sites**
+
+`GCSSource.__init__` reads `GCP_HMAC_ACCESS_KEY` / `GCP_HMAC_SECRET_KEY` from `.env`
+via dotenv and selects the auth path automatically:
+
+- **ADC (default):** uses `google-cloud-storage` `blob.open("r", newline="")` — true
+  streaming, memory proportional to `batch_size` not file size.
+- **HMAC / S3-interoperability:** uses `boto3` S3 client pointed at
+  `https://storage.googleapis.com` with `s3v4` signing, wrapping the `StreamingBody`
+  in `codecs.getreader("utf-8")` for a text stream. Install with
+  `pip install aura-ingest-accelerator[hmac]`. `boto3` is lazy-imported inside the
+  `if` branch — it is never required unless HMAC keys are present.
+
+Both paths expose a `self._open_stream` context-manager callable consumed identically
+in `get_batches()`. Supplying only one HMAC key raises `ValueError` immediately.
+
+**Batch import pattern**
+
+`Neo4jImporter.run_import()` drives `source.get_batches(batch_size)` and executes
+each batch via `UNWIND $rows AS row`. Transient Neo4j errors (Aura scaling events)
+are retried with exponential backoff up to `max_retries` (default 3).
+
+**Transform pipeline**
+
+Optional `transform_fn(row) -> dict | None` is applied per-row before the batch is
+sent. Returning `None` skips the row. Transform functions are registered by name in
+`TRANSFORMS` in `main.py` and referenced by the `transform` key in `config.yaml`.
 
 ### Known Issues / Tech Debt
-_Track known bugs and deferred work here._
+
+- `GCSSource` with `blob.open()` yields inside a `with` block (generator + context
+  manager). The stream is closed on generator exhaustion or `.close()`. Callers that
+  abandon a partially-consumed generator (e.g. early `next()` preview calls in the
+  notebook) should call `.close()` explicitly or use `next()` inside a `try/finally`.
+  In practice the GC handles it, but it's worth noting.
