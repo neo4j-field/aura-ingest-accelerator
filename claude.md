@@ -1,17 +1,39 @@
 <!-- AUTO-GENERATED: base + modules[neo4j] -->
-<!-- Do not edit above ## Project-Specific -->
+<!-- Do not edit above ## Project-Specific — run refresh-claude.sh to update -->
+<!-- dev-standards: https://github.com/pdrangeid/dev-standards -->
 
+# Claude Standards: Base Python Conventions
+
+This file encodes universal patterns and conventions for all Python projects
+in this ecosystem. It is auto-fetched by `setup-project.sh` and `refresh-claude.sh`.
 
 ---
 
 ## Language & Runtime
 
 - **Python ≥ 3.11** (use match statements, `X | Y` union types, `tomllib`, etc. freely)
-- **Package manager**: `uv` preferred for running scripts (`uv run python -m ...`); `pip` acceptable
 - **Project config**: `pyproject.toml` only — no `setup.py`, no `setup.cfg`
 - **Formatter**: `black` (line length 88)
 - **Linter**: `ruff` (rules: E, F, W, I, UP, B)
 - **Testing**: `pytest` with `pytest-cov`; test files in `tests/`, named `test_*.py`
+
+---
+
+## Package Management
+
+- `uv` is the preferred package manager and script runner for all projects
+- Always document `uv` invocations first in README and usage docs:
+  ```sh
+  # Preferred
+  uv run python -m <package>.main <command> --debug
+
+  # Fallback (traditional venv activated)
+  python -m <package>.main <command> --debug
+  ```
+- Install dependencies with `uv pip install -e .[dev]` — not bare `pip install`
+- Use `uv venv` for environment creation — not `python -m venv`
+- `uv run` does not require activating the venv — prefer it for one-off execution
+- Legacy projects using `argparse` should migrate to `typer` when next significantly touched
 
 ---
 
@@ -40,36 +62,35 @@
   - `✨` new discovery / heuristic match
   - `🔗` relationship found
   - `🌿` enrichment
-  - ⚠️ warning (via `logger.warning`)
-  
+  - `⚠️` warning (via `logger.warning`)
 
 Example invocation pattern (always document in README):
 ```sh
-PYTHONPATH=. uv run python -m <package>.main <command> --flag value --debug
+uv run python -m <package>.main <command> --flag value --debug
 ```
 
 ---
 
 ## Logging
 
-- Use `logging.getLogger(__name__)` at module level for all parsers/engines
+- Use `logging.getLogger(__name__)` at module level for all modules
 - Use `logging.getLogger("ClassName")` inside classes
 - `--debug` flag sets `logging.DEBUG`; default is `logging.INFO`
 - `logger.info()` for significant discoveries and milestones
-- `logger.debug()` for AST node walks, column-level detail, fallback logic
-- `logger.warning()` for orphaned entries, unresolved references, skipped nodes
-- `logger.error()` for parse failures (always include the exception: `f"Failed to parse {file}: {e}"`)
-- Never use `print()` for logging — use rich console for user output, logger for diagnostic output
+- `logger.debug()` for detail-level tracing and fallback logic
+- `logger.warning()` for skipped entries, unresolved references, non-fatal issues
+- `logger.error()` for failures — always include context: `f"Failed to process {item}: {e}"`
+- Never use `print()` for logging — use rich console for user output, logger for diagnostics
 
 ---
 
 ## Error Handling
 
 - Never let a single bad record crash the whole run — catch, log, continue
-- Log failures at `logger.error()` with context: `f"Failed to process {item}: {e}"`
 - Collect and surface skipped/failed items at the end of a run — never silently drop them
 - Fallback chains: try clean path first, then defensive fallbacks; log each fallback at `debug` level
-- Defensive attribute access on objects with variable structure: prefer `getattr(obj, 'attr', None)` over direct access
+- Defensive attribute access on objects with variable structure:
+  prefer `getattr(obj, 'attr', None)` over direct attribute access
 
 ---
 
@@ -79,31 +100,54 @@ PYTHONPATH=. uv run python -m <package>.main <command> --flag value --debug
 <project_name>/
 ├── pyproject.toml
 ├── README.md
-├── ARCHITECTURE.md          # Required for all projects
-├── requirements.txt         # Pinned runtime deps (generated)
-├── requirements-dev.txt     # Points to pyproject.toml dev extras
+├── ARCHITECTURE.md              # Required for all projects
+├── claude.md                    # Auto-generated standards + Project-Specific section
+├── requirements.txt             # Pinned runtime deps (generated)
+├── requirements-dev.txt         # Points to pyproject.toml dev extras
 ├── <package_name>/
 │   ├── __init__.py
-│   ├── main.py              # CLI entry point (typer app)
+│   └── main.py                  # CLI entry point (typer app)
+├── config/
+│   └── config.yaml              # Primary project config
+├── docs/
+│   └── usage_instructions.md
 ├── tests/
-├── output/                  # Generated manifests or other exports or results (gitignored)
-└── test/data/               # Test fixtures (DDL, CSV, JSON)
+│   └── data/                    # Test fixtures
+└── output/                      # Generated artifacts (gitignored)
 ```
+
+---
+
+## Configuration Conventions
+
+- All project configuration lives in `config/` — never hardcode paths,
+  credentials, or environment-specific values in source code
+- Credentials exclusively via `.env` (gitignored) — always provide `.env.example`
+- A `config.yaml` (or project-named equivalent) is the primary config file,
+  loaded at startup via a dedicated `config.py` module
+- Never load config inline in business logic — always via `config.py`
+- `config.py` is the only module that reads `.env` and YAML —
+  everything else receives config as parameters
+- Config should be loaded once at startup and passed down —
+  not re-read on every function call
 
 ---
 
 ## Documentation Standards
 
 - Every project must have:
-  - `README.md` with Quick Start showing all three pipeline stages with example CLI invocations
-  - `ARCHITECTURE.md` explaining the design philosophy, data-flow and component responsibilities
-- ARCHITECTURE.md must include a component table: Component | Responsibility | Key Logic
+  - `README.md` with Quick Start showing the core workflow with example CLI invocations
+  - `ARCHITECTURE.md` explaining design philosophy, data flow, and component responsibilities
+- `ARCHITECTURE.md` must include a component table: Component | Responsibility | Key Logic
 - Inline docstrings on all public methods — one-liner minimum, full docstring for complex logic
-- Complex fallback logic (e.g., AST node extraction) should have inline `logger.debug()` comments explaining *why* each fallback exists, not just what it does
+- Complex fallback logic should have inline `logger.debug()` comments explaining
+  *why* each fallback exists, not just what it does
+
+---
 
 ## Documentation Currency
 
-Claude should treat README.md and ARCHITECTURE.md as live artifacts,
+Claude should treat `README.md` and `ARCHITECTURE.md` as live artifacts,
 not one-time scaffolding. After any session that produces:
 
 - A working new module or command
@@ -116,14 +160,14 @@ not one-time scaffolding. After any session that produces:
   "We just got X working. Want me to update README.md / ARCHITECTURE.md
    to reflect this before we close out?"
 
-### What to check when updating:
+### What to check when updating
 - README Quick Start — does the example command still work as written?
 - README Workflow section — does it reflect current pipeline steps?
 - ARCHITECTURE.md Data Flow — does the diagram match current reality?
 - ARCHITECTURE.md Component table — any new modules to add?
-- docs/usage_instructions.md — any new flags, args, or config keys?
+- `docs/usage_instructions.md` — any new flags, args, or config keys?
 
-### What NOT to do:
+### What NOT to do
 - Don't prompt after every small change — only after validated, working functionality
 - Don't rewrite sections that are still accurate
 - Don't update docs speculatively for features not yet working
@@ -137,8 +181,8 @@ When a user signals they're done for the session (e.g. "ok that's good for now",
 "let's stop here", "committing this"), Claude should quickly check:
 
 1. Were any docs updated to match what was built? If not, offer to do it now.
-2. Are there any known bugs or deferred decisions worth logging to a Lesson node?
-3. Have we added any modules that should be added to requirements.txt or requirements-dev.txt or pyproject.toml
+2. Are there any deferred decisions or known issues worth noting somewhere?
+3. Have any new dependencies been added that need updating in `pyproject.toml`?
 4. Is there anything that should be committed that hasn't been?
 
 Keep this lightweight — one short prompt, not an interrogation.
@@ -148,51 +192,196 @@ Keep this lightweight — one short prompt, not an interrogation.
 ## Working Conventions (Claude Collaboration)
 
 ### Tooling
-- **Preferred**: Claude Code (CLI) for active coding sessions — direct filesystem access, no upload/download cycle
-- **Fallback**: Upload files to this chat for review/analysis; produce complete ready-to-save files in response
+- **Preferred**: Claude Code (CLI) for active coding sessions — direct filesystem
+  access, no upload/download cycle
+- **Fallback**: Upload files to chat for review; produce complete ready-to-save
+  files in response (not diffs) for any change larger than ~10 lines
 - **VSCode** is the primary editor; GitHub for all repos
-- Always produce complete files, not diff-style patches, for any change larger than ~10 lines
-
-### Testing Environment
-- Never hardcode connection details — always use the profiles system in a relevant yaml file in /config
 
 ### Session Continuity
-- This `claude.md` is the shared contract across sessions — reference it at the start of any new coding session
-- If a parallel session  produces new conventions, update this file before continuing in other sessions
+- `claude.md` is the shared contract across sessions — read it at the start of
+  every new coding session before touching any code
+- If a parallel session produces new conventions, update `claude.md` before
+  continuing in other sessions to prevent drift
 
 ### GitHub Workflow
-- Standard branch-per-feature workflow assumed
-- `main` / `master` is stable; feature branches for all active work
-- Update `ARCHITECTURE.md` when module boundaries change significantly — don't let it drift from reality
+- Standard branch-per-feature workflow
+- `main` is stable; `develop` is integration; feature branches for all active work
+- Update `ARCHITECTURE.md` when module boundaries change significantly —
+  don't let it drift from reality
+- Claude Code commits freely on feature/* and develop branches
+- Merge to main is always a deliberate human action — never ask
+  Claude Code to merge or push to main
+- Use --no-ff merges to preserve branch history
+- Tag main after merging a completed feature or version
+- Claude Code should always commit before ending a session
 
----
-
-## Configuration Conventions
-
-- All project configuration lives in `config/` — never hardcode paths, 
-  credentials, or environment-specific values in source code
-- Credentials exclusively via `.env` (gitignored) — always provide `.env.example`
-- A `config.yaml` (or project-named equivalent) is the primary config file,
-  loaded at startup via a dedicated `config.py` module (if required)
-- Never load config inline in business logic — always via a dedicated `config.py`
-- `config.py` is the only module that reads `.env` and YAML — 
-  everything else receives config as parameters
-- Config should be loaded once at startup and passed down — 
-  not re-read on every function call
 ---
 
 ## What NOT to Do (Base Rules)
 
-**All analyzers / datasource-graph-analyzer:**
+- **Don't** use `print()` — use logger or rich console
+- **Don't** hardcode paths, credentials, or environment values in source code
+- **Don't** re-read config on every function call — load once at startup
+- **Don't** produce diff-style patches for changes — always produce complete files
+- **Don't** let `README.md` or `ARCHITECTURE.md` drift from what the code actually does
 
-- Don't use `print()` — use logger or rich console
-- Don't hardcode paths, credentials, or environment values in source code
-- Don't re-read config on every function call — load once at startup# Claude Module: Neo4j / Graph Standards
+---
+
+## Session Management
+
+### The `.session/` Directory
+
+Every project contains a `.session/` directory for structured Claude Code session files.
+This is the bridge between architecture/planning sessions (Claude web) and
+implementation sessions (Claude Code).
+
+```
+.session/
+├── _template.md                  # canonical template — do not edit, copy to create sessions
+├── specs/                        # durable, promoted decisions (always tracked)
+│   └── [topic]-baseline.md       # locked architectural decisions, schemas, contracts
+└── YYYY-MM-DD-[topic].md         # active or archived session files (tracked)
+```
+
+### Starting a Claude Code Session
+
+At the start of every session, before touching any code:
+
+1. Read `claude.md` (always)
+2. Check for a session file: `ls .session/` — if a dated `.md` file exists and is `Status: active`, read it
+3. Read any `specs/` files referenced in the session file
+4. Confirm your understanding of the **Goal** and **Constraints** before proceeding
+
+If no session file exists, ask the user if there's a session to load or proceed with
+their in-chat instructions.
+
+### During a Session
+
+- Append decisions, discoveries, and deviations to `## Decisions Made This Session`
+- If a constraint or out-of-scope boundary is hit, surface it explicitly rather than silently working around it
+- Do not modify `_template.md` — copy it, rename it, then edit the copy
+
+### Closing a Session
+
+When the user signals the session is complete:
+
+1. Update `Status:` to `complete` in the session file
+2. Identify any decisions that should be promoted to `specs/` or `claude.md`
+3. Offer to move durable decisions to the right location
+4. **Update `claude.md`:**
+   - Append a one-paragraph entry to the **Review Log** covering what was built,
+     what changed, and any bugs fixed
+   - Update **Next Steps** to reflect current state — remove completed items,
+     add newly unblocked ones
+   - Update **Technical Debt** if new deferred items were identified
+5. Follow the standard Session Close Checklist (docs, deps, commit)
+6. if the  `### Review Log` section of `claude.md` exceeds 10 entries, archive all but the 5 most recent to `/CHANGELOG.md` (append, don't overwrite), then remove the archived entries from `claude.md`
+
+> `claude.md` must be updated in the same commit as the session file closure.
+> It is the living contract read at the start of every future session — if it
+> drifts, every subsequent session starts with stale context.
+
+### Authoring Workflow
+
+Session files are typically drafted in Claude web and dropped into `.session/` before
+a Claude Code session begins. The standard handoff:
+
+1. Claude web session → produces `.session/YYYY-MM-DD-topic.md`
+2. File dropped into repo
+3. Claude Code session: `"Read .session/2025-04-24-topic.md and proceed"`
+
+This keeps planning and implementation cleanly separated while maintaining a full
+decision audit trail in version control.# Claude Module: Neo4j / Graph Standards
 
 Cypher generation conventions, MERGE patterns, CALL {} rules, APOC conventions,
 and constraint management for all projects that write to or read from Neo4j.
 
 ---
+
+## Shared Neo4j Library — lifeos-neo4j
+
+All lifeos projects that require a Neo4j connection must import from
+`lifeos-neo4j` rather than implementing their own connection management.
+This is the single source of truth for driver creation, profile loading,
+capability detection, and ConnectionContext.
+
+### Adding the dependency
+
+In `pyproject.toml`:
+```toml
+[project]
+dependencies = [
+    "lifeos-neo4j @ file://../../packages/lifeos-neo4j",
+    # adjust relative path based on project location
+]
+```
+
+For projects outside the lifeos monorepo structure, use an absolute path
+or a git reference once lifeos-neo4j is published:
+```toml
+"lifeos-neo4j @ git+https://github.com/pdrangeid/lifeos-neo4j@main"
+```
+
+### Public API
+```python
+from lifeos_neo4j.connection import (
+    get_driver,           # raw Driver for simple cases
+    get_context,          # ConnectionContext — preferred for most use
+    get_default_kg_context,   # reads schemata.default_kg_profile
+    get_default_meta_context, # reads schemata.default_meta_profile
+)
+from lifeos_neo4j.capability_detector import detect_capabilities, CapabilityProfile
+from lifeos_neo4j.profiles import load_profiles
+```
+
+### ConnectionContext
+
+Prefer `get_context()` over `get_driver()` — it carries `driver`,
+`database`, and `profile_name` together so callers don't have to
+track them separately:
+```python
+ctx = get_context("lifeos-kg", config_path)
+
+# Capability detection is explicit and optional — not forced at construction
+ctx.capabilities = detect_capabilities(ctx.driver, ctx.database)
+
+# Use in session
+with ctx.driver.session(database=ctx.database) as session:
+    ...
+```
+
+### close_driver_after pattern
+
+Any function that accepts an optional ConnectionContext must follow
+this pattern — never close a context you didn't create:
+```python
+def my_operation(ctx: ConnectionContext | None = None) -> None:
+    close_ctx_after = ctx is None
+    if ctx is None:
+        ctx = get_context("lifeos-kg", config_path)
+    try:
+        with ctx.driver.session(database=ctx.database) as session:
+            ...
+    finally:
+        if close_ctx_after:
+            ctx.driver.close()
+```
+
+### Integration testing
+
+All projects using lifeos-neo4j follow the same integration test convention:
+
+- Config: `~/.lifeos/test-profiles.yaml` — machine-local, never committed
+- Credentials: `.env` in project root — `NEO4J_USER_TEST_NEO4J` / `NEO4J_PASSWORD_TEST_NEO4J`
+- Skip condition: test skips gracefully if config or credentials absent
+- `conftest.py` must call `load_dotenv()` before collection to ensure
+  env vars are available at skipif evaluation time
+```python
+# tests/conftest.py
+from dotenv import load_dotenv
+load_dotenv()
+```
 
 ## Cypher Generation Standards
 
@@ -205,8 +394,9 @@ and constraint management for all projects that write to or read from Neo4j.
   ON MATCH SET n.modifiedEpochMillis = now, n.modifiedDatetime = datetime(now)
   SET n.property = 'value';
   ```
+- All string values escaped via `_escape()` — never f-string raw user data directly into Cypher
 - Timestamps: use `datetime('ISO8601_STRING')` format, UTC by default
-- Session timestamp passed into exporter at construction time — never generated mid-export
+- Ensure consistant timestamps (by generating in python when practical - or top of cypher if inline) avoid generated transactionally (unless context demands granularity)
 - Use `IF NOT EXISTS` on all `CREATE CONSTRAINT` and `CREATE INDEX` statements
 - Use `ON CREATE SET` / `ON MATCH SET` to separate immutable and updateable fields
 - Always use `WITH` between `MERGE` → `MATCH` transitions to preserve scope
@@ -311,6 +501,27 @@ and constraint management for all projects that write to or read from Neo4j.
 - **Don't** use `exists(n.prop)` — use `n.prop IS NULL` / `n.prop IS NOT NULL`
 - **Don't** store maps as node properties — encode as JSON strings
 - **Don't** add new relationship types or node labels without documenting them in `## Project-Specific`
+- **Don't** implement your own `get_driver()` or profile loader — import from lifeos-neo4j
+- **Don't** hardcode Neo4j URIs or credentials anywhere — always profiles + .env
+- **Don't** call `detect_capabilities()` inside `get_context()` — capability
+  detection is explicit, callers opt in
+- **Don't** close a ConnectionContext you didn't create
+- **Don't** share sessions across major operations — one session per logical unit of work
+- **Don't** store `ConnectionContext` as a module-level global — 
+  construct at CLI parse time and pass down
+
+---
+
+## AI Session Files
+
+The `.session/` directory contains structured handoff files for AI coding agents.
+To add a new data source connector, start here:
+
+    .session/add-connector.md
+
+Read that file completely before writing any code. It contains the BaseSource
+contract, file naming convention, main.py registration steps, and config.yaml
+schema.
 
 ---
 
@@ -362,3 +573,12 @@ sent. Returning `None` skips the row. Transform functions are registered by name
   abandon a partially-consumed generator (e.g. early `next()` preview calls in the
   notebook) should call `.close()` explicitly or use `next()` inside a `try/finally`.
   In practice the GC handles it, but it's worth noting.
+
+### Review Log
+
+**2026-04-28** — Added AI-assisted connector onboarding: created `.session/add-connector.md`
+(fully pre-filled with real `BaseSource` signature, `build_source()` registration pattern,
+`config.yaml` schema, and a worked skeleton modeled on `BigQuerySource`); added `## AI Session
+Files` section to `claude.md` pointing agents at the session file; appended a "Using AI to Add
+a New Connector" section to `poc_walkthrough.ipynb` with workflow steps, tool-specific tips
+for Claude Code / Copilot / Codex, and a common-failures table. No source files modified.
