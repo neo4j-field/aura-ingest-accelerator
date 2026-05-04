@@ -9,7 +9,7 @@ Topic: aura-ingest-accelerator-ai-onboarding
 
 ## Goal
 
-Add two pieces of customer-facing AI onboarding to the `aura-ingest-accelerator` repo: (1) a pre-written `.session/add-connector.md` session file that gives an AI coding agent (Claude Code, Codex, Copilot) the full context it needs to implement a new `sources/` connector while respecting the repo architecture; and (2) a new section in `poc_walkthrough.ipynb` titled "Using AI to Add a New Connector" that walks a customer through the workflow with tool-specific tips for Claude Code, GitHub Copilot, and OpenAI Codex. The `.session/` directory and `_template.md` already exist — do not recreate them.
+Add two pieces of customer-facing AI onboarding to the `aura-ingest-accelerator` repo: (1) a pre-written `.session/add-connector.md` session file that gives an AI coding agent (The AI Coding Agent, Codex, Copilot) the full context it needs to implement a new `sources/` connector while respecting the repo architecture; and (2) a new section in `poc_walkthrough.ipynb` titled "Using AI to Add a New Connector" that walks a customer through the workflow with tool-specific tips for The AI Coding Agent, GitHub Copilot, and OpenAI Codex. The `.session/` directory and `_template.md` already exist — do not recreate them.
 
 ---
 
@@ -149,7 +149,7 @@ connector with minimal hand-holding, as long as it's pointed at the right contex
 ### Prerequisites
 - Repo cloned, venv active (see Quickstart in README)
 - `.env` configured with AuraDB credentials
-- An AI coding agent: Claude Code (recommended), GitHub Copilot Workspace,
+- An AI coding agent: The AI Coding Agent (recommended), GitHub Copilot Workspace,
   or ChatGPT / Codex with file upload
 
 ---
@@ -190,15 +190,15 @@ Conventional commit prefix: `feat(sources): add <source_name> connector`
 
 ### Tool-Specific Tips
 
-#### Claude Code
-Paste this as your opening message in a Claude Code session:
+#### The AI Coding Agent
+Paste this as your opening message in a The AI Coding Agent session:
 
 ```
 Read .session/add-connector.md completely, then implement a connector for [source system].
 Ask me for any credential structure or SDK details before writing code.
 ```
 
-Claude Code can read repo files directly — give it access to the full working directory.
+The AI Coding Agent can read repo files directly — give it access to the full working directory.
 
 #### GitHub Copilot Workspace
 - Open a new Workspace task; paste the **Goal** section of `add-connector.md` as the task description.
@@ -235,7 +235,7 @@ Claude Code can read repo files directly — give it access to the full working 
 
 2. **Create** `.session/add-connector.md` as a fully pre-filled session file with `Status: active`. Populate **Relevant Specs / Schemas / Examples** with: the real `BaseSource` class body (copied verbatim from `sources/base.py`), the single-file naming convention, the two-step `main.py` registration pattern (import + instantiate), the `config.yaml` job schema, and a worked skeleton modeled on the simpler of the two existing source files. Populate **Instructions** with numbered steps covering: read base class → create source file → implement `get_batches()` → add import to `main.py` → add instantiation to `run_poc()` → add `config.yaml` entry → add MERGE index → test with `batch_size: 10`.
 
-3. **Update `claude.md`** to add a `## AI Session Files` section (after existing sections, before any footer):
+3. **Update `.ai-standards.md`** to add a `## AI Session Files` section (after existing sections, before any footer):
    ```markdown
    ## AI Session Files
 

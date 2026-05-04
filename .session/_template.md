@@ -20,7 +20,7 @@ No code changes. Documentation output only.
 
 ## Context & Constraints
 
-- **Out of scope**: Do not modify any source code, claude.md, README.md, or ARCHITECTURE.md
+- **Out of scope**: Do not modify any source code, .ai-standards.md, README.md, or ARCHITECTURE.md
 - **Out of scope**: Do not make new architectural decisions — only extract what is already documented
 - **Out of scope**: Do not infer or speculate — if something is ambiguous, note it as `[UNCLEAR]`
 - **Output target**: `.session/specs/[repo-name]-baseline.md`
@@ -29,7 +29,7 @@ No code changes. Documentation output only.
 
 ## Instructions
 
-1. Read `claude.md` — specifically the `## Project-Specific` section.
+1. Read `.ai-standards.md` — specifically the `## Project-Specific` section.
 2. Read `README.md` — extract any stated design constraints, integration points, or usage contracts.
 3. Read `ARCHITECTURE.md` — extract data flow, component responsibilities, and any locked decisions.
 4. Read any files in `docs/` that contain design decisions.
@@ -44,7 +44,7 @@ No code changes. Documentation output only.
 # Baseline Spec: [repo-name]
 
 Extracted: YYYY-MM-DD
-Source: README.md, ARCHITECTURE.md, claude.md ## Project-Specific
+Source: README.md, ARCHITECTURE.md, .ai-standards.md ## Project-Specific
 Status: baseline (locked — update via new session file)
 
 ---

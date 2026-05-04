@@ -1,26 +1,38 @@
 # main.py
 import yaml
+import logging
+from typing import Optional
+import typer
+from rich.console import Console
+from rich.logging import RichHandler
 from importer import Neo4jImporter
 from sources.bigquery_source import BigQuerySource
 from sources.gcs_source import GCSSource
+
+# =============================================================================
+# CLI & Logging Setup
+# =============================================================================
+
+app = typer.Typer(help="Neo4j AuraDB Ingestion Accelerator")
+console = Console()
+
+def setup_logging(debug: bool = False):
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True, console=console, show_path=False)]
+    )
 
 
 # =============================================================================
 # Optional transform functions
 # =============================================================================
-# Map a transform function name (as used in config.yaml) to a callable.
-# Return None to skip a row; otherwise return the (modified) row dict.
-# =============================================================================
 
 def transform_part_row(row: dict) -> dict | None:
     """
     Example row-level transform for a parts dataset.
-
-    Rules applied:
-      - Rows missing 'partnum' are dropped (return None → skipped by importer).
-      - 'partnum' is normalized to uppercase.
-      - 'is_active' boolean is derived from the 'status' field.
-      - A static 'import_source' tag is added for lineage tracking.
     """
     if not row.get("partnum"):
         return None
@@ -56,28 +68,48 @@ def build_source(cfg: dict):
 
 
 # =============================================================================
-# Config-driven import runner
+# CLI Command
 # =============================================================================
 
-def run_poc(config_path: str = "config.yaml"):
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
+@app.command()
+def run(
+    config_path: str = typer.Option("config.yaml", "--config", "-c", help="Path to config.yaml"),
+    debug: bool = typer.Option(False, "--debug", help="Enable debug logging")
+):
+    """
+    Run the ingestion POC based on the provided configuration file.
+    """
+    setup_logging(debug)
+    
+    try:
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+    except FileNotFoundError:
+        console.print(f"❌ [bold red]Error:[/] Config file not found at {config_path}")
+        raise typer.Exit(code=1)
 
-    with Neo4jImporter() as importer:
-        for job in config.get("imports", []):
-            name = job.get("name", "Unnamed")
-            print(f"\n--- {name} ---")
+    console.print(f"🔍 [bold blue]Starting import jobs from {config_path}...[/]")
 
-            source = build_source(job)
-            transform_fn = TRANSFORMS.get(job.get("transform"))  # None if not specified
+    try:
+        with Neo4jImporter() as importer:
+            for job in config.get("imports", []):
+                name = job.get("name", "Unnamed")
+                console.print(f"\n🚀 [bold]Job: {name}[/]")
 
-            importer.run_import(
-                source=source,
-                cypher_query=job["cypher"],
-                batch_size=job.get("batch_size", 1000),
-                transform_fn=transform_fn,
-            )
+                source = build_source(job)
+                transform_fn = TRANSFORMS.get(job.get("transform"))
+
+                importer.run_import(
+                    source=source,
+                    cypher_query=job["cypher"],
+                    batch_size=job.get("batch_size", 1000),
+                    transform_fn=transform_fn,
+                )
+        console.print("\n✅ [bold green]All import jobs completed successfully![/]")
+    except Exception as e:
+        console.print(f"\n❌ [bold red]Import failed:[/] {e}")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
-    run_poc()
+    app()

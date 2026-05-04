@@ -25,6 +25,9 @@ A lightweight, modular batch import toolkit for getting data into AuraDB quickly
 
 ## Quickstart
 
+Note for Windows Users: To enable AI standards symlinks, ensure you have Developer Mode enabled and clone the repo with 
+git clone -c core.symlinks=true <url>
+
 ### 1. Prerequisites
 
 - Python 3.11+
@@ -34,9 +37,9 @@ A lightweight, modular batch import toolkit for getting data into AuraDB quickly
 ### 2. Set Up the Environment
 
 ```bash
-python -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install neo4j python-dotenv google-cloud-bigquery google-cloud-storage db-dtypes
+uv pip install -e .[dev]
 ```
 
 ### 3. Configure Credentials
@@ -62,10 +65,10 @@ NEO4J_URI=neo4j+s://your-private-link-dns:7687
 
 Open `poc_walkthrough.ipynb` in Jupyter or Vertex AI Notebooks and run cells top to bottom. It will verify connectivity, preview your data, and run a test import before going full scale.
 
-Or run directly:
+Or run directly via CLI:
 
 ```bash
-python main.py
+uv run python main.py run --config config.yaml
 ```
 
 ---
@@ -77,7 +80,7 @@ python main.py
 All import jobs are defined in config.yaml — queries, Cypher, source details, and batch sizes. Credentials stay in .env. This is the only file customers need to edit for a typical POC.
 
 ```yaml
-yamlimports:
+imports:
   - name: "Client Nodes"
     source: bigquery
     query: >
@@ -105,12 +108,11 @@ transform | — | Name of a transform function defined in main.py
 `Neo4jImporter` handles the connection, batching, retries, and summary logging. All your Cypher queries use the `UNWIND $rows AS row` pattern — the importer passes each batch as `{"rows": [...]}`.
 
 ```python
-f# Run all jobs defined in config.yaml
-python main.py
+# Run all jobs defined in config.yaml
+uv run python main.py run
 
 # Or point at a different config file
-from main import run_poc
-run_poc("config_staging.yaml")
+uv run python main.py run --config config_staging.yaml
 ```
 
 ### Adding a Transform
@@ -189,24 +191,30 @@ If your AuraDB instance is on a private link:
 
 ---
 
-## Indexing
+## Data Integrity & Performance: Constraints
 
-Create indexes on any property used in a `MERGE` before you run your import. Without them, every `MERGE` performs a full label scan — at POC scale this is slow, at production scale it can stall the import entirely.
+Before running your import, you **must** create Uniqueness Constraints on any property used in a `MERGE`. Without them:
+1.  Every `MERGE` performs a full label scan, which is slow and gets exponentially slower as data grows.
+2.  You risk creating duplicate nodes if multiple batches run in parallel (though this kit is sequential).
 
 Use `IF NOT EXISTS` so the statements are safe to re-run:
 
 ```cypher
-CREATE INDEX client_node_id IF NOT EXISTS FOR (p:ClientNode) ON (p.id);
-CREATE INDEX supplier_code  IF NOT EXISTS FOR (d:Supplier)    ON (d.supplierCode);
+CREATE CONSTRAINT client_node_id IF NOT EXISTS FOR (p:ClientNode) REQUIRE p.id IS UNIQUE;
+CREATE CONSTRAINT supplier_code  IF NOT EXISTS FOR (d:Supplier)   REQUIRE d.supplierCode IS UNIQUE;
 ```
 
-Run these in the AuraDB Browser or via a setup script before calling `run_import()`. You can verify what's active at any time with:
+Run these in the AuraDB Browser or via a setup script before calling the importer. You can verify what's active at any time with:
 
 ```cypher
-SHOW INDEXES;
+SHOW CONSTRAINTS;
 ```
 
-**Rule of thumb:** any property that appears in a `MERGE (n:Label {property: value})` clause needs an index. Properties only referenced in `SET` do not (necessarily).
+**Rule of thumb:** If it's in the `{id: row.id}` part of your `MERGE`, it needs a constraint. For non-unique properties that you frequently filter on, use a standard index:
+
+```cypher
+CREATE INDEX part_status IF NOT EXISTS FOR (p:Part) ON (p.status);
+```
 
 ---
 
