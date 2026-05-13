@@ -218,6 +218,44 @@ CREATE INDEX part_status IF NOT EXISTS FOR (p:Part) ON (p.status);
 
 ---
 
+## Testing
+
+The test suite exercises the full `config.yaml → importer.py → Neo4j` pipeline using in-memory mock sources — no GCP credentials required.
+
+### Prerequisites
+
+- Python 3.11+
+- A local Neo4j instance (Neo4j Desktop, CE, or Docker)
+
+### Run Locally
+
+```bash
+# 1. Start a local Neo4j instance (Neo4j Desktop or Docker)
+# 2. Set connection details in .env (defaults: bolt://localhost:7687, neo4j/testpassword)
+
+uv pip install -e .[dev]
+uv run pytest tests/ -v
+```
+
+The test suite reads `NEO4J_URI`, `NEO4J_USER`, and `NEO4J_PASSWORD` from your `.env` file (via `python-dotenv`), so no extra environment setup is needed beyond what you already have.
+
+### Test Coverage
+
+| File | What it tests |
+|---|---|
+| `tests/test_importer.py` | End-to-end ingest: merge, batch boundaries, transforms, skip logic, connectivity errors |
+| `tests/test_sources.py` | MockSource batching integrity; GCSSource and BigQuerySource CSV/row parsing (GCP clients mocked) |
+
+### GCP Integration Tests
+
+Tests that hit real BigQuery or GCS are **out of scope** for this suite — they require live GCP credentials and are best run separately in a GCP environment. The mock sources (`MockBigQuerySource`, `MockGCSSource` in `sources/mock.py`) stand in for them during CI.
+
+### CI (GitHub Actions)
+
+The workflow in [`.github/workflows/test.yml`](.github/workflows/test.yml) runs on every push/PR to `develop`. It spins up a `neo4j:5` service container and runs the full suite.
+
+---
+
 ## Extending This Kit
 
 As you encounter new data sources in future POCs, add them to `sources/` following the `BaseSource` pattern. Some common candidates:

@@ -1,4 +1,5 @@
 # main.py
+import os
 import yaml
 import logging
 from typing import Optional
@@ -60,6 +61,9 @@ def build_source(cfg: dict):
         return BigQuerySource(cfg["query"])
     elif source_type == "gcs":
         return GCSSource(bucket_name=cfg["bucket"], blob_name=cfg["blob"])
+    elif source_type == "mock" and os.getenv("AURA_TEST_MODE"):
+        from sources.mock import MockSource
+        return MockSource(cfg.get("rows", []))
     else:
         raise ValueError(
             f"Unknown source type '{source_type}'. "
