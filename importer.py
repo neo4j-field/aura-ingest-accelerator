@@ -2,7 +2,7 @@
 import os
 import time
 import logging
-from neo4j import GraphDatabase, auth as neo4j_auth
+from neo4j import GraphDatabase, bearer_auth
 from neo4j.exceptions import ServiceUnavailable, TransientError
 from dotenv import load_dotenv
 
@@ -44,7 +44,7 @@ class Neo4jImporter:
         if auth:
             self.auth = auth
         elif os.getenv("NEO4J_TOKEN"):  # Truthiness check — skips empty string
-            self.auth = neo4j_auth.bearer(os.getenv("NEO4J_TOKEN"))
+            self.auth = bearer_auth(os.getenv("NEO4J_TOKEN"))
         else:
             user = os.getenv("NEO4J_USER")
             password = os.getenv("NEO4J_PASSWORD")
