@@ -94,7 +94,7 @@ class Neo4jImporter:
         cypher_query: str,
         batch_size: int = 1000,
         transform_fn=None,
-        max_retries: int = 3,
+        max_retries: int = 0,
     ):
         """
         Iterates over source.get_batches(), optionally transforms each row,
@@ -106,8 +106,11 @@ class Neo4jImporter:
             batch_size:    Rows per transaction. 500–2000 is typical for Aura.
             transform_fn:  Optional callable(row) → dict | None.
                            Return None to skip a row.
-            max_retries:   Retry attempts on transient Neo4j errors (e.g. Aura
-                           scaling events).
+            max_retries:   Extra retry attempts on transient Neo4j errors
+                           (ServiceUnavailable, TransientError). Defaults to 0 —
+                           fail immediately on first error so Cypher mistakes surface
+                           without delay. Set to 3 for production / long-running imports
+                           where Aura scaling events are possible.
         """
         total = {"nodes_created": 0, "properties_set": 0, "relationships_created": 0}
 
@@ -157,21 +160,23 @@ class Neo4jImporter:
         Retrying with backoff is the recommended pattern rather than failing the
         entire import.
         """
-        for attempt in range(1, max_retries + 1):
+        total_attempts = max_retries + 1
+
+        for attempt in range(1, total_attempts + 1):
             try:
                 result = session.run(cypher, {"rows": batch})
                 return result.consume()
             except (ServiceUnavailable, TransientError) as e:
-                if attempt == max_retries:
+                if attempt == total_attempts:
                     logger.error(
-                        "Batch failed after %d attempts: %s", max_retries, e
+                        "Batch failed after %d attempt(s): %s", total_attempts, e
                     )
                     raise
                 wait = 2 ** attempt
                 logger.warning(
                     "Transient error on attempt %d/%d — retrying in %ds: %s",
                     attempt,
-                    max_retries,
+                    total_attempts,
                     wait,
                     e,
                 )
