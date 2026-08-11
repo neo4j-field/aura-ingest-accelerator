@@ -300,58 +300,6 @@ and constraint management for all projects that write to or read from Neo4j.
 
 ---
 
-## Shared Neo4j Library — lifeos-neo4j
-
-All lifeos projects that require a Neo4j connection must import from
-`lifeos-neo4j` rather than implementing their own connection management.
-This is the single source of truth for driver creation, profile loading,
-capability detection, and ConnectionContext.
-
-### Adding the dependency
-
-In `pyproject.toml`:
-```toml
-[project]
-dependencies = [
-    "lifeos-neo4j @ file://../../packages/lifeos-neo4j",
-    # adjust relative path based on project location
-]
-```
-
-For projects outside the lifeos monorepo structure, use an absolute path
-or a git reference once lifeos-neo4j is published:
-```toml
-"lifeos-neo4j @ git+https://github.com/pdrangeid/lifeos-neo4j@main"
-```
-
-### Public API
-```python
-from lifeos_neo4j.connection import (
-    get_driver,           # raw Driver for simple cases
-    get_context,          # ConnectionContext — preferred for most use
-    get_default_kg_context,   # reads schemata.default_kg_profile
-    get_default_meta_context, # reads schemata.default_meta_profile
-)
-from lifeos_neo4j.capability_detector import detect_capabilities, CapabilityProfile
-from lifeos_neo4j.profiles import load_profiles
-```
-
-### ConnectionContext
-
-Prefer `get_context()` over `get_driver()` — it carries `driver`,
-`database`, and `profile_name` together so callers don't have to
-track them separately:
-```python
-ctx = get_context("lifeos-kg", config_path)
-
-# Capability detection is explicit and optional — not forced at construction
-ctx.capabilities = detect_capabilities(ctx.driver, ctx.database)
-
-# Use in session
-with ctx.driver.session(database=ctx.database) as session:
-    ...
-```
-
 ### close_driver_after pattern
 
 Any function that accepts an optional ConnectionContext must follow
@@ -369,21 +317,6 @@ def my_operation(ctx: ConnectionContext | None = None) -> None:
             ctx.driver.close()
 ```
 
-### Integration testing
-
-All projects using lifeos-neo4j follow the same integration test convention:
-
-- Config: `~/.lifeos/test-profiles.yaml` — machine-local, never committed
-- Credentials: `.env` in project root — `NEO4J_USER_TEST_NEO4J` / `NEO4J_PASSWORD_TEST_NEO4J`
-- Skip condition: test skips gracefully if config or credentials absent
-- `conftest.py` must call `load_dotenv()` before collection to ensure
-  env vars are available at skipif evaluation time
-```python
-# tests/conftest.py
-from dotenv import load_dotenv
-load_dotenv()
-```
-
 ## Cypher Generation Standards
 
 - All MERGE statements must be **idempotent** — use `MERGE`, never `CREATE` for nodes that may already exist
@@ -395,7 +328,6 @@ load_dotenv()
   ON MATCH SET n.modifiedEpochMillis = now, n.modifiedDatetime = datetime(now)
   SET n.property = 'value';
   ```
-- All string values escaped via `_escape()` — never f-string raw user data directly into Cypher
 - Timestamps: use `datetime('ISO8601_STRING')` format, UTC by default
 - Ensure consistant timestamps (by generating in python when practical - or top of cypher if inline) avoid generated transactionally (unless context demands granularity)
 - Use `IF NOT EXISTS` on all `CREATE CONSTRAINT` and `CREATE INDEX` statements
@@ -408,9 +340,6 @@ load_dotenv()
   `modifiedEpochMillis` and `modifiedDatetime` — omit only when a downstream importer
   handles timestamp assignment (e.g., manifest-style Cypher output)
 - Use `IS NULL` instead of `exists(n.prop)` — `exists()` is deprecated in Neo4j 5.x
-- If `"parameterized": false` is present in the request, use literal values instead of
-  `$parameters` — enables compatibility with Neo4j Browser and schema illustration.
-  Default is parameterized unless explicitly disabled.
 - Never MERGE on nullable or optional properties — use a reduced stable key set in the
   MERGE predicate; apply optional/nullable fields via `SET` after the MERGE
 - When setting string properties, do not use Python-style triple quotes (`"""`).
