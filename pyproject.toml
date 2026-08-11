@@ -32,6 +32,9 @@ dev = [
 hmac = [
     "boto3>=1.26.0"
 ]
+databricks = [
+    "databricks-sql-connector>=3.0.0"
+]
 
 [project.scripts]
 # Uncomment after defining your CLI entry point:

@@ -1,6 +1,6 @@
 # Neo4j AuraDB — POC Jumpstart Kit
 
-A lightweight, modular batch import toolkit for getting data into AuraDB quickly during a proof of concept. Designed for GCP environments (BigQuery, GCS) with private-link connectivity.
+A lightweight, modular batch import toolkit for getting data into AuraDB quickly during a proof of concept. Designed for GCP environments (BigQuery, GCS) with private-link connectivity, plus Databricks Unity Catalog.
 
 > **Not an ETL framework.** This is intentionally minimal — a clean starting point you can adapt, not a platform you have to learn.
 
@@ -15,7 +15,8 @@ A lightweight, modular batch import toolkit for getting data into AuraDB quickly
 ├── sources/
 │   ├── base.py                  # BaseSource ABC — extend this for new sources
 │   ├── bigquery_source.py       # Stream rows from a BigQuery query
-│   └── gcs_source.py            # Stream rows from a GCS CSV file
+│   ├── gcs_source.py            # Stream rows from a GCS CSV file
+│   └── databricks_source.py     # Stream rows from a Databricks Unity Catalog query
 ├── config.yaml                  # All import jobs — queries, Cypher, batch 
 ├── env.sample                   # Copy to .env and fill in your values
 └── .gitignore
@@ -96,8 +97,8 @@ Each job entry supports:
 | Key | Required | Description |
 |---|---|---|
 name | - | for logging output
-source |✅ |bigquery or gcs
-query | ✅ |(BigQuery)Standard SQL query
+source |✅ |bigquery, gcs, or databricks
+query | ✅ |(BigQuery / Databricks) Standard SQL query
 bucket / blob| ✅ |(GCS)GCS bucket name and file path
 cypher |✅ |Cypher using UNWIND $rows AS row
 batch_size | — | Rows per transaction (default: 1000)
@@ -157,12 +158,29 @@ class MyCustomSource(BaseSource):
 |---|---|---|
 | BigQuery | `BigQuerySource(query, project_id=None)` | Uses ADC. `query_job.result()` is a lazy iterator — rows are not loaded into memory all at once. |
 | GCS CSV | `GCSSource(bucket_name, blob_name)` | Downloads full blob before parsing. Fine for POC-scale files. |
+| Databricks | `DatabricksSource(query)` | Unity Catalog managed tables via SQL Warehouse. Streams via `cursor.fetchmany(batch_size)` — memory proportional to batch size, not table size. |
 
-**GCP Authentication:** Both sources use [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials). Set `GOOGLE_APPLICATION_CREDENTIALS` in `.env` to point at a service account key file, or run `gcloud auth application-default login` for local development.
+**GCP Authentication:** Both GCP sources use [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials). Set `GOOGLE_APPLICATION_CREDENTIALS` in `.env` to point at a service account key file, or run `gcloud auth application-default login` for local development.
 
 **Required IAM roles:**
 - BigQuery: `BigQuery Data Viewer` + `BigQuery Job User`
 - GCS: `Storage Object Viewer`
+
+**Databricks Authentication:** Uses a Personal Access Token — no OAuth/service-principal support yet (POC scope). Requires the optional `[databricks]` extra:
+
+```bash
+uv pip install -e ".[databricks]"
+```
+
+Set in `.env`:
+
+```
+DATABRICKS_SERVER_HOSTNAME=your-workspace.cloud.databricks.com
+DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/xxxxxxxxxxxxxxxx
+DATABRICKS_TOKEN=
+```
+
+Find these under **SQL Warehouses → (your warehouse) → Connection Details**, and generate a token under **User Settings → Developer → Access Tokens**. The `databricks.sql` driver import is lazy — it's only required when a `databricks` job actually runs, so the extra doesn't need to be installed for GCP-only POCs.
 
 ---
 
@@ -186,8 +204,12 @@ If your AuraDB instance is on a private link:
 | `NEO4J_PASSWORD` | ✅ * | Database password |
 | `NEO4J_TOKEN` | — | Bearer token. If set, takes precedence over user/password. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | Path to GCP service account key JSON. Optional if using ADC. |
+| `DATABRICKS_SERVER_HOSTNAME` | — † | SQL Warehouse hostname. Required if using `source: databricks`. |
+| `DATABRICKS_HTTP_PATH` | — † | SQL Warehouse HTTP path. Required if using `source: databricks`. |
+| `DATABRICKS_TOKEN` | — † | Personal Access Token. Required if using `source: databricks`. |
 
 *`NEO4J_USER` + `NEO4J_PASSWORD` are required unless `NEO4J_TOKEN` is set.
+†All three Databricks variables are required together if any `databricks` source job is configured; otherwise omit them entirely.
 
 ---
 

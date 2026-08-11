@@ -46,3 +46,22 @@ imports:
       MERGE (d:Supplier {supplierCode: row.code})
       SET d.name = row.name, d.location = row.city
     batch_size: 500
+
+  # Validated end-to-end 2026-08-11 against a local Neo4j test server using the
+  # Unity Catalog samples.tpch.customer table (constraint create + import +
+  # count verification all passed). TODO: replace query/cypher with the
+  # customer's actual Unity Catalog table, columns, and target label/merge
+  # key before running against the real Aura target.
+  - name: "Databricks Table Import"
+    source: databricks
+    query: >
+      SELECT c_custkey, c_name, c_phone, c_mktsegment
+      FROM samples.tpch.customer
+      LIMIT 1000
+    cypher: |
+      UNWIND $rows AS row
+      MERGE (c:Customer {custkey: row.c_custkey})
+      SET c.name = row.c_name,
+          c.phone = row.c_phone,
+          c.marketSegment = row.c_mktsegment
+    batch_size: 500

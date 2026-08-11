@@ -519,10 +519,11 @@ load_dotenv()
 
 ### Overview
 
-Modular Python ingestion framework for loading data into Neo4j Aura from GCS (CSV)
-and BigQuery. Core components: `Neo4jImporter` (batch Cypher execution with retry),
-`GCSSource` / `BigQuerySource` (streaming data sources), and a config-driven runner
-in `main.py` that wires sources, transforms, and Cypher together from `config.yaml`.
+Modular Python ingestion framework for loading data into Neo4j Aura from GCS (CSV),
+BigQuery, and Databricks Unity Catalog. Core components: `Neo4jImporter` (batch
+Cypher execution with retry), `GCSSource` / `BigQuerySource` / `DatabricksSource`
+(streaming data sources), and a config-driven runner in `main.py` that wires
+sources, transforms, and Cypher together from `config.yaml`.
 
 ### Key Patterns
 
@@ -556,6 +557,27 @@ Optional `transform_fn(row) -> dict | None` is applied per-row before the batch 
 sent. Returning `None` skips the row. Transform functions are registered by name in
 `TRANSFORMS` in `main.py` and referenced by the `transform` key in `config.yaml`.
 
+**DatabricksSource — PAT auth, lazy driver import**
+
+`DatabricksSource.__init__` reads `DATABRICKS_SERVER_HOSTNAME` / `DATABRICKS_HTTP_PATH`
+/ `DATABRICKS_TOKEN` from `.env` and raises `ValueError` immediately if any are
+missing. `databricks.sql` is lazy-imported inside `get_batches()` (same convention
+as `boto3` in `GCSSource`) — the `[databricks]` extra (`databricks-sql-connector`)
+is never required unless a `databricks` job actually runs. Streams via
+`cursor.fetchmany(batch_size)`, converting each row with `row.asDict()`. Validated
+end-to-end against `samples.tpch.customer` (Unity Catalog sample data) into a local
+Neo4j test instance — connector mechanics confirmed sound; PAT is POC-scope only,
+no OAuth/service-principal auth yet.
+
+### Next Steps
+
+- Swap the `"Databricks Table Import"` job in `config.yaml` from the
+  `samples.tpch.customer` validation query to the actual customer Unity Catalog
+  table/columns once provided — config-only change, no code expected.
+- Before running that job past a small test batch, create the real identity-property
+  uniqueness constraint for whatever label it merges on (see `README.md`'s
+  Constraints section).
+
 ### Known Issues / Tech Debt
 
 - `GCSSource` with `blob.open()` yields inside a `with` block (generator + context
@@ -565,6 +587,16 @@ sent. Returning `None` skips the row. Transform functions are registered by name
   In practice the GC handles it, but it's worth noting.
 
 ### Review Log
+
+**2026-08-11** — Added Databricks Unity Catalog connector: `sources/databricks_source.py`
+(`DatabricksSource`, PAT auth via `.env`, lazy-imports `databricks.sql`), registered in
+`build_source()` in `main.py`, `[databricks]` extra added to `pyproject.toml`, and
+`DATABRICKS_*` vars documented in `env.sample`. Validated end-to-end against a local
+Neo4j test server using the Unity Catalog `samples.tpch.customer` sample table:
+constraint creation, batched import (20 rows/2 batches), and node-count verification
+all passed. `config.yaml` updated with the validated query/cypher; swapping in the
+real customer table is deferred to a future session. `README.md` and `ARCHITECTURE.md`
+updated to document the new source.
 
 **2026-05-03** — Public release preparation: added `PyYAML` to `pyproject.toml` and `poc_walkthrough.ipynb`; refactored `main.py` to use `typer` for CLI and `rich` for logging; removed root logging config from `importer.py`; created `ARCHITECTURE.md` as required by standards; updated `README.md` and walkthrough to prioritize `CREATE CONSTRAINT` over `CREATE INDEX` for identity properties; verified `uv` usage patterns across documentation.
 
