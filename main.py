@@ -9,6 +9,7 @@ from rich.logging import RichHandler
 from importer import Neo4jImporter
 from sources.bigquery_source import BigQuerySource
 from sources.gcs_source import GCSSource
+from sources.databricks_source import DatabricksSource
 
 # =============================================================================
 # CLI & Logging Setup
@@ -61,13 +62,15 @@ def build_source(cfg: dict):
         return BigQuerySource(cfg["query"])
     elif source_type == "gcs":
         return GCSSource(bucket_name=cfg["bucket"], blob_name=cfg["blob"])
+    elif source_type == "databricks":
+        return DatabricksSource(cfg["query"])
     elif source_type == "mock" and os.getenv("AURA_TEST_MODE"):
         from sources.mock import MockSource
         return MockSource(cfg.get("rows", []))
     else:
         raise ValueError(
             f"Unknown source type '{source_type}'. "
-            f"Valid options: bigquery, gcs"
+            f"Valid options: bigquery, gcs, databricks"
         )
 
 
