@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aura-ingest-accelerator"
-version = "0.1.0"
+version = "0.2.0"
 description = "A modular Python-based ingestion framework designed for rapid Neo4j Aura prototyping. This library provides a scalable quick-start alternative to distributed ETL jobs, allowing for secure, high-performance data loading from GCS and BigQuery within VPC environments. Features include batch-optimized Cypher execution, pre-load data transformations, modular datasources"
 readme = "README.md"
 requires-python = ">=3.11"
