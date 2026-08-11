@@ -64,7 +64,7 @@ NEO4J_URI=neo4j+s://your-private-link-dns:7687
 
 ### 4. Run the Walkthrough
 
-Open `poc_walkthrough.ipynb` in Jupyter or Vertex AI Notebooks and run cells top to bottom. It will verify connectivity, preview your data, and run a test import before going full scale.
+Open `poc_walkthrough.ipynb` in Jupyter or Vertex AI Notebooks and run cells top to bottom. It will verify connectivity, preview your data, run a test import, let you explore the imported graph with a few basic Cypher queries, and then run the full import.
 
 Or run directly via CLI:
 

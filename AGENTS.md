@@ -585,8 +585,28 @@ no OAuth/service-principal auth yet.
   abandon a partially-consumed generator (e.g. early `next()` preview calls in the
   notebook) should call `.close()` explicitly or use `next()` inside a `try/finally`.
   In practice the GC handles it, but it's worth noting.
+- The notebook's main walkthrough (sections 1–8) only ever imports `ClientNode`
+  (via `NODE_CYPHER`) — it never runs the "Interactions" job from `config.yaml`,
+  so the `INTERACTED_WITH` relationship is never populated by following the
+  notebook top to bottom. The "6a. Exploring Your Data" section's traversal/
+  aggregation examples depend on that relationship and are guarded with a `⚠️`
+  callout + empty-result check rather than silently failing. If a future session
+  wires the Interactions job into the main walkthrough (or the Appendix), this
+  callout should be revisited/removed.
 
 ### Review Log
+
+**2026-08-11** — Closed session `poc-walkthrough-query-intro`: added a new
+"6a. Exploring Your Data — Basic Queries" section to `poc_walkthrough.ipynb`,
+inserted between the Test Import verification cell and "7. Full Import" (8 new
+cells: filtering with `MATCH`/`WHERE`, one-hop traversal via `INTERACTED_WITH`,
+aggregation with `count`/`ORDER BY`, and a `RETURN` vs `RETURN DISTINCT` callout;
+one GraphAcademy Cypher Fundamentals link embedded once). No existing cells
+modified — diff is purely additive. Surfaced and documented a pre-existing gap
+(see Known Issues above): the notebook's main flow never populates
+`INTERACTED_WITH`, so the new traversal/aggregation examples return empty
+results until the customer runs the "Interactions" job from `config.yaml`
+themselves. `README.md` Quickstart updated to mention the new exploration step.
 
 **2026-08-11** — Added Databricks Unity Catalog connector: `sources/databricks_source.py`
 (`DatabricksSource`, PAT auth via `.env`, lazy-imports `databricks.sql`), registered in
