@@ -449,10 +449,12 @@ def my_operation(ctx: ConnectionContext | None = None) -> None:
 ### Overview
 
 Modular Python ingestion framework for loading data into Neo4j Aura from GCS (CSV),
-BigQuery, and Databricks Unity Catalog. Core components: `Neo4jImporter` (batch
-Cypher execution with retry), `GCSSource` / `BigQuerySource` / `DatabricksSource`
-(streaming data sources), and a config-driven runner in `main.py` that wires
-sources, transforms, and Cypher together from `config.yaml`.
+BigQuery, Databricks Unity Catalog, and Satisfactory `.sav` save files. Core
+components: `Neo4jImporter` (batch Cypher execution with retry), `GCSSource` /
+`BigQuerySource` / `DatabricksSource` / `SatisfactorySource` (data sources — the
+first three stream, the last parses fully into memory), and a config-driven
+runner in `main.py` that wires sources, transforms, and Cypher together from a
+`config.yaml`-style file.
 
 ### Key Patterns
 
@@ -498,6 +500,31 @@ end-to-end against `samples.tpch.customer` (Unity Catalog sample data) into a lo
 Neo4j test instance — connector mechanics confirmed sound; PAT is POC-scope only,
 no OAuth/service-principal auth yet.
 
+**SatisfactorySource — one class, seven `extract` projections, full-parse cache**
+
+`SatisfactorySource(save_path, extract)` parses a Satisfactory `.sav` file with the
+optional `satisfactory-save` PyPI package (lazy-imported inside `_save()`, same
+convention as `boto3`/`databricks.sql`) and yields one of seven named row shapes
+selected by `extract`: `save`, `levels`, `classes`, `actors`, `inventory_stacks`,
+`factory_links`, `power_links`. `save_path` accepts `${VAR}`-style env-var
+references (e.g. `"${SATISFACTORY_SAVE_PATH}"` in `config-satisfactory.yaml`) —
+`__init__` calls `load_dotenv()` then `os.path.expandvars()` itself, because this
+repo's config loader does plain `yaml.safe_load` with no interpolation of its own.
+
+Parsing is cached at module level, keyed on `(resolved_path, st_mtime_ns,
+st_size)`, so all seven jobs against one save file parse the `.sav` exactly once
+per process even though each job constructs its own `SatisfactorySource` instance.
+Every object's owning actor is derived by string-splitting its save path on the
+last `.` (e.g. `...Build_ConstructorMk1_C_123.Output0` → owner
+`...Build_ConstructorMk1_C_123`) — components never store an explicit `Owner`
+back-reference in this parser version.
+
+Validated end-to-end (extract-only, no live Aura write) against a real ~4.2MB /
+~55,000-object save (`FFD_autosave_2.sav`, ~1060 hours played): all seven
+extracts ran clean and produced plausible row shapes and counts (31,255 actors,
+6,075 factory links, 2,487 power links, 4,124 non-empty inventory stacks, 209
+distinct classes). See Known Issues below for what's still unverified.
+
 ### Next Steps
 
 - Swap the `"Databricks Table Import"` job in `config.yaml` from the
@@ -506,6 +533,16 @@ no OAuth/service-principal auth yet.
 - Before running that job past a small test batch, create the real identity-property
   uniqueness constraint for whatever label it merges on (see `README.md`'s
   Constraints section).
+- Run `cypher/satisfactory_constraints.cypher`, then `config-satisfactory.yaml`
+  with `batch_size: 10` (its current setting), against a real Aura target — this
+  session validated the Python-side extracts only, not a live Cypher/Aura round
+  trip. Bump `batch_size` to 1000 (500 for `factory_links`) once verified.
+- Validate `factory_links` direction against ground truth per the session recipe
+  in `.session/2026-08-12-satisfactory-source.md` step 9: pick one machine in
+  Paul's save whose real inputs/outputs are known, confirm the graph agrees. The
+  direction heuristic (see Known Issues) has not been empirically checked yet.
+- GPL-3 licensing decision (see Known Issues) blocks merging this branch past a
+  feature branch — do not merge to `develop` or `main` until resolved.
 
 ### Known Issues / Tech Debt
 
@@ -522,8 +559,88 @@ no OAuth/service-principal auth yet.
   callout + empty-result check rather than silently failing. If a future session
   wires the Interactions job into the main walkthrough (or the Appendix), this
   callout should be revisited/removed.
+- **`SatisfactorySource` deliberately breaks the streaming contract every other
+  source in this repo follows.** A save's cross-references (belt endpoints,
+  power circuits) can't be resolved without the full object graph in memory
+  first, so `get_batches()` parses everything before yielding anything. A
+  large late-game save (10^5–10^6 objects) will occupy low single-digit GB of
+  RAM during parse. This is an accepted, deliberate deviation, not an
+  oversight — see `.session/2026-08-12-satisfactory-source.md`. If it becomes
+  a real problem, the fix is a pre-flatten step (save → NDJSON on disk →
+  existing file-based source), not an attempt to stream the parser.
+- **`FGFactoryConnectionComponent` / `FGPipeConnectionComponent` have no
+  `mDirection` property** — the session spec assumed one would exist and it
+  doesn't (verified against a real save; the only property present is
+  `mConnectedComponent`). `_extract_factory_links()` instead infers direction
+  from the component's own path segment name: `Output*`/`Input*` on buildings
+  are authoritative; ambiguous belt/pipe endpoints (`ConveyorAny*`,
+  `PipelineConnection*`, `SnapOnly*`, `Connection*`) fall back to an
+  index-parity guess (trailing digit `0` = inbound, `>=1` = outbound). This
+  heuristic is **unvalidated against ground truth** — do this before trusting
+  `FEEDS`/`SUPPLIES` direction for anything: pick one machine in-game whose
+  real inputs/outputs are known and confirm the graph agrees.
+- `satisfactory-save` writes some parser diagnostics (`[W] Unknown struct
+  name "VehiclePathBlockReference"...`, malformed `mSpawnData` on
+  `BP_CreatureSpawner` objects) directly to the process's stdout, not through
+  Python's `logging` module — `logging.disable()` does not silence it. Noisy
+  but non-fatal; expect it on every parse. Worth revisiting if it ever
+  pollutes a script's stdout-based output contract.
+- `satisfactory-save` and its only viable alternative are both **GPL-3.0**
+  licensed; `aura-ingest-accelerator`'s own license line is currently
+  commented out in `pyproject.toml` and the project is intended for public
+  distribution. The `[satisfactory]` extra keeps this an opt-in dependency
+  (same pattern as `[hmac]`'s `boto3`), which is a materially weaker coupling
+  than vendoring — but it is Paul's call, not the agent's. **Do not merge this
+  connector past a feature branch until the repo's license is decided.** If
+  the answer comes back unfavorable, the fallback is a separate companion
+  repo, not shipping it here.
+- `satisfactory-save` publishes wheels for `manylinux_2_27+ x86_64` and
+  `win_amd64` only — no macOS or aarch64 wheels. Those platforms fall back to
+  the sdist and need a C++ toolchain; this affects anyone demoing from Apple
+  Silicon.
+- The "machine" vs "building" category split follows the session's literal
+  rule (`Build_*` owning ≥1 factory connection → machine) rather than any
+  gameplay notion of "produces something." On a real save this labels
+  `Build_StorageContainerMk1_C` and `Build_ConveyorPole_C` as `machine`
+  because they own `Output`/`Input` connection components — correct per spec,
+  but worth flagging if it reads oddly in the teaching notebook later.
+
+### Node Labels & Relationship Types — Satisfactory Connector
+
+Per the Neo4j module's Relationship Type Governance rules — introduced by
+`sources/satisfactory_source.py` / `config-satisfactory.yaml` /
+`cypher/satisfactory_postimport.cypher`:
+
+**Node labels:** `:Save`, `:Level`, `:Class`, `:Actor` (base label on every save
+object), `:Building` (also `:Actor`), `:Machine` (also `:Building`), `:Conveyor`
+(also `:Building`), `:Pipe` (also `:Building`), `:Item`, `:PowerCircuit`.
+
+**Relationship types:** `HAS_LEVEL` (`Save`→`Level`), `CONTAINS` (`Level`→`Actor`),
+`INSTANCE_OF` (`Actor`→`Class`), `FEEDS` (`Actor`→`Actor`, raw per-hop belt/pipe
+chain — direction unvalidated, see Known Issues), `SUPPLIES` (`Machine`→`Machine`,
+derived post-import, belts/pipes collapsed out), `ON_CIRCUIT` (`Actor`→`PowerCircuit`),
+`HOLDS` (`Actor`→`Item`).
 
 ### Review Log
+
+**2026-08-12** — Added Satisfactory save-game connector: `sources/satisfactory_source.py`
+(`SatisfactorySource`, one class / seven `extract` projections — `save`, `levels`,
+`classes`, `actors`, `inventory_stacks`, `factory_links`, `power_links` — lazy-imports
+`satisfactory_save`, module-level parse cache keyed on path/mtime/size), registered in
+`build_source()` in `main.py`, `[satisfactory]` extra added to `pyproject.toml`,
+`SATISFACTORY_SAVE_PATH` documented in `env.sample`, `config-satisfactory.yaml` created
+with all seven jobs at `batch_size: 10`, and `cypher/satisfactory_constraints.cypher` /
+`cypher/satisfactory_postimport.cypher` created (uniqueness constraints; semantic-label
+assignment + collapsed `SUPPLIES` edge). Before writing any extract, inspected a real save
+(`FFD_autosave_2.sav`, ~55,000 objects) directly with the installed `satisfactory-save`
+0.11.0 library — this caught a spec assumption that didn't hold (no `mDirection` property
+on connection components; direction is name/index-encoded instead) and confirmed every
+other field name used. All seven extracts smoke-tested clean against that real save
+(Python-side only — no live Aura write this session, no Neo4j credentials configured).
+Two things are explicitly unresolved and block merging past this feature branch: the
+`factory_links` direction heuristic needs ground-truth validation against Paul's own
+factory, and the parser's GPL-3.0 license needs a decision against this repo's own
+(currently unset) license before any public-facing merge. See Known Issues above.
 
 **2026-08-11** — Closed session `poc-walkthrough-query-intro`: added a new
 "6a. Exploring Your Data — Basic Queries" section to `poc_walkthrough.ipynb`,

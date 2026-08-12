@@ -27,7 +27,7 @@ wheels = [
 
 [[package]]
 name = "aura-ingest-accelerator"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "google-cloud-bigquery" },
@@ -52,6 +52,9 @@ dev = [
 hmac = [
     { name = "boto3" },
 ]
+satisfactory = [
+    { name = "satisfactory-save" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -67,9 +70,10 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
+    { name = "satisfactory-save", marker = "extra == 'satisfactory'", specifier = ">=0.11.0" },
     { name = "typer", specifier = ">=0.9.0" },
 ]
-provides-extras = ["dev", "hmac", "databricks"]
+provides-extras = ["dev", "hmac", "databricks", "satisfactory"]
 
 [[package]]
 name = "black"
@@ -1308,6 +1312,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9b/ec/7c692cde9125b77e84b307354d4fb705f98b8ccad59a036d5957ca75bfc3/s3transfer-0.17.0.tar.gz", hash = "sha256:9edeb6d1c3c2f89d6050348548834ad8289610d886e5bf7b7207728bd43ce33a", size = 155337, upload-time = "2026-04-29T22:07:36.33Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/87/72/c6c32d2b657fa3dad1de340254e14390b1e334ce38268b7ad51abda3c8c2/s3transfer-0.17.0-py3-none-any.whl", hash = "sha256:ce3801712acf4ad3e89fb9990df97b4972e93f4b3b0004d214be5bce12814c20", size = 86811, upload-time = "2026-04-29T22:07:34.966Z" },
+]
+
+[[package]]
+name = "satisfactory-save"
+version = "0.11.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/b6/cdcf333607c28fa04a66a95fac05a04166a31caed41fdf20087410e3679b/satisfactory_save-0.11.0.tar.gz", hash = "sha256:02c4c387843b1efe2fb4fde5e9b5f4901385fac3f4c19ebfa79a17b89e64ee56", size = 1014953, upload-time = "2026-04-04T15:58:57.055Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/36/bca1e8b9db4b3cd580479e70820efec043e463ecfa3c4abd3b4a52ea1dd8/satisfactory_save-0.11.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:aaaa2e86043b2b1ffbe4af06a54fb89d35afabfa367716e17b52be2ad7b6b4db", size = 1858725, upload-time = "2026-04-04T15:58:34.788Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/e1/d245dd499e2cf06373db7f99b0346900958190a043837cc1abd12c338c50/satisfactory_save-0.11.0-cp311-cp311-win_amd64.whl", hash = "sha256:6d4b06437ae9f14050e3da2e0ca2079a44199639285b3fe0e0ce261ff0c75c44", size = 1136826, upload-time = "2026-04-04T15:58:36.56Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/da/c6c1e4ef1889fdcc80769384061a33eed58eaa1546256f424e3afec74acc/satisfactory_save-0.11.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:425193f696d94f0dd34c7d4d76dfaf2fcf301fd686aff1d19fd15c41eb085194", size = 1866346, upload-time = "2026-04-04T15:58:38.47Z" },
+    { url = "https://files.pythonhosted.org/packages/88/d2/43c093aa48adf383a8c15bdc1b3ed63f043f1cb01b2b417174a29fd231bd/satisfactory_save-0.11.0-cp312-cp312-win_amd64.whl", hash = "sha256:a6799f9cf1c66aae8fd021caa464ee1fe52a2577585db3e134b4cfca1ad3c39d", size = 1144974, upload-time = "2026-04-04T15:58:40.275Z" },
+    { url = "https://files.pythonhosted.org/packages/da/02/74c4d01394e75b38ba2e1356040b58e9226a3bfb4cf616916d0e93894099/satisfactory_save-0.11.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ac5254030722600db1467ec8041e063e3b687a0ffecaed3cc31c35c152a8172c", size = 1866810, upload-time = "2026-04-04T15:58:42.577Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/01/fdf2f53e8245a37573ee75c2272d9d06ba21a112c0f833f663547d92f749/satisfactory_save-0.11.0-cp313-cp313-win_amd64.whl", hash = "sha256:fb35a2a1fbd34857133652de6f58a3df7ca042fd44d2abd1ac5dee5573728627", size = 1144939, upload-time = "2026-04-04T15:58:44.749Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/03/708e3634a8f6b9dccb642608e262d21a35141952c2a49753b56247fe292e/satisfactory_save-0.11.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b44b25099054ac2f0f52ac2011b63c513a562b99028d72c4ad6becd362871e13", size = 1868795, upload-time = "2026-04-04T15:58:46.292Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/ca/34f7a4dc45b4cbb35425d765778c201ee27a021dd1bee678e2c71270b72f/satisfactory_save-0.11.0-cp314-cp314-win_amd64.whl", hash = "sha256:e616ec596184ab1036f0df1c73327eec5d8706f98c58f60b4371c750f005c4c1", size = 1185284, upload-time = "2026-04-04T15:58:48.197Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/87/57127ef2eca2e3745053411f11aabb9a5a321117ffe759ebfba3c00696a7/satisfactory_save-0.11.0-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:54c0226d3278d8140bc6c501dde79eb5b7ca0c56a5e3b737c63b48dc07d5aac9", size = 1896781, upload-time = "2026-04-04T15:58:49.796Z" },
+    { url = "https://files.pythonhosted.org/packages/22/92/e98237f53aed8e89b6c535cf7b0dd6afd7b40ca6280f6f7a39defdcfa877/satisfactory_save-0.11.0-cp314-cp314t-win_amd64.whl", hash = "sha256:809279c62a26afc5111147b25f301ece33196cb5efe1b1ee1bfa8eb0116a6a65", size = 1316770, upload-time = "2026-04-04T15:58:51.585Z" },
 ]
 
 [[package]]
