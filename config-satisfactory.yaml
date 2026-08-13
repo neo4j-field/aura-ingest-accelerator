@@ -8,16 +8,18 @@
 # job below completes (semantic labels + the collapsed SUPPLIES edge).
 #
 # Jobs are ordered by dependency — nodes before edges. Run the full sequence
-# with:
-#   uv run python main.py run --config config-satisfactory.yaml --debug
+# with (no "run" subcommand — main.py is a single-command Typer app):
+#   uv run python main.py --config config-satisfactory.yaml --debug
 #
 # SATISFACTORY_SAVE_PATH is read from .env by SatisfactorySource — set it
 # there before running. Requires the [satisfactory] extra:
 #   uv pip install -e .[satisfactory]
 #
-# batch_size is intentionally small (10) below for the first test pass. Bump
-# to 1000 (500 for factory_links) once every job has verified correct on a
-# small slice — see AGENTS.md "Testing" instructions for this connector.
+# batch_size below (1000, 500 for factory_links) is the production setting,
+# validated 2026-08-12 against a real ~55,000-object save on a local Neo4j
+# instance at batch_size 10 first — see docs/satisfactory.md for the full
+# test-run results. Drop back to a small value like 10 if you're testing
+# against a new/different save for the first time.
 # =============================================================================
 
 imports:
@@ -39,7 +41,7 @@ imports:
           s.saveVersion = row.saveVersion,
           s.buildVersion = row.buildVersion,
           s.savedAtEpochMillis = row.savedAtEpochMillis
-    batch_size: 10
+    batch_size: 1000
 
   - name: "Levels"
     source: satisfactory
@@ -55,7 +57,7 @@ imports:
       WITH l, row
       MATCH (s:Save {saveId: row.saveId})
       MERGE (s)-[:HAS_LEVEL]->(l)
-    batch_size: 10
+    batch_size: 1000
 
   - name: "Classes"
     source: satisfactory
@@ -69,7 +71,7 @@ imports:
                     c.createdDatetime    = now
       SET c.shortName = row.shortName,
           c.category = row.category
-    batch_size: 10
+    batch_size: 1000
 
   - name: "Actors"
     source: satisfactory
@@ -94,7 +96,7 @@ imports:
       WITH a, row
       MATCH (l:Level {name: row.levelName})
       MERGE (l)-[:CONTAINS]->(a)
-    batch_size: 10
+    batch_size: 1000
 
   - name: "Inventory Stacks"
     source: satisfactory
@@ -107,7 +109,7 @@ imports:
       MERGE (a)-[r:HOLDS]->(i)
       ON CREATE SET r.slotIndex = row.slotIndex, r.count = row.count
       ON MATCH SET  r.count = r.count + row.count
-    batch_size: 10
+    batch_size: 1000
 
   - name: "Factory Links"
     source: satisfactory
@@ -119,7 +121,7 @@ imports:
       MATCH (b:Actor {instanceName: row.toInstanceName})
       MERGE (a)-[r:FEEDS]->(b)
       ON CREATE SET r.kind = row.kind
-    batch_size: 10
+    batch_size: 500
 
   - name: "Power Links"
     source: satisfactory
@@ -130,4 +132,4 @@ imports:
       MATCH (a:Actor {instanceName: row.instanceName})
       MERGE (p:PowerCircuit {circuitId: row.circuitId})
       MERGE (a)-[:ON_CIRCUIT]->(p)
-    batch_size: 10
+    batch_size: 1000

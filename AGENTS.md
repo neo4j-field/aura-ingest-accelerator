@@ -519,11 +519,17 @@ last `.` (e.g. `...Build_ConstructorMk1_C_123.Output0` → owner
 `...Build_ConstructorMk1_C_123`) — components never store an explicit `Owner`
 back-reference in this parser version.
 
-Validated end-to-end (extract-only, no live Aura write) against a real ~4.2MB /
-~55,000-object save (`FFD_autosave_2.sav`, ~1060 hours played): all seven
-extracts ran clean and produced plausible row shapes and counts (31,255 actors,
-6,075 factory links, 2,487 power links, 4,124 non-empty inventory stacks, 209
-distinct classes). See Known Issues below for what's still unverified.
+Validated end-to-end against that same real save on a local Neo4j instance
+(constraints → import at batch_size 10 → import at production batch_size
+against a cleared DB, byte-identical results both times → postimport pass):
+31,077 `Actor` nodes, 6,075 `FEEDS` / 1,785 `SUPPLIES` / 2,408 `ON_CIRCUIT` /
+1,708 `HOLDS` relationships. Full numbers, timing (7.37s / ~532MB peak RSS
+locally), and the direction-heuristic structural validation (miners show 0
+incoming `FEEDS`, smelters/constructors show ~1:1 in/out — consistent with
+real recipe topology) are in **`docs/satisfactory.md`**, which is the
+complete reference for this connector and deliberately kept out of
+`README.md`/`ARCHITECTURE.md` (internal/demo connector, not customer-facing).
+See Known Issues below and that doc for what's still unverified.
 
 ### Next Steps
 
@@ -533,14 +539,16 @@ distinct classes). See Known Issues below for what's still unverified.
 - Before running that job past a small test batch, create the real identity-property
   uniqueness constraint for whatever label it merges on (see `README.md`'s
   Constraints section).
-- Run `cypher/satisfactory_constraints.cypher`, then `config-satisfactory.yaml`
-  with `batch_size: 10` (its current setting), against a real Aura target — this
-  session validated the Python-side extracts only, not a live Cypher/Aura round
-  trip. Bump `batch_size` to 1000 (500 for `factory_links`) once verified.
-- Validate `factory_links` direction against ground truth per the session recipe
-  in `.session/2026-08-12-satisfactory-source.md` step 9: pick one machine in
-  Paul's save whose real inputs/outputs are known, confirm the graph agrees. The
-  direction heuristic (see Known Issues) has not been empirically checked yet.
+- ~~Run `cypher/satisfactory_constraints.cypher`, then `config-satisfactory.yaml`... against a real target~~ —
+  **done 2026-08-12** against a local Neo4j instance (constraints, import at
+  batch_size 10 and at production batch_size, postimport pass). Still not run
+  against an actual Aura endpoint — expect materially different timing from
+  network round-trips per batch. See `docs/satisfactory.md`.
+- Do the literal in-game eyeball check for `factory_links` direction (session
+  step 9): pick one machine in Paul's save whose real inputs/outputs are known,
+  confirm the graph agrees. 2026-08-12's structural/class-level check (miners
+  show 0 incoming `FEEDS`, smelters/constructors ~1:1 in/out) is strong
+  evidence but isn't that literal check — see `docs/satisfactory.md`.
 - GPL-3 licensing decision (see Known Issues) blocks merging this branch past a
   feature branch — do not merge to `develop` or `main` until resolved.
 
@@ -575,10 +583,19 @@ distinct classes). See Known Issues below for what's still unverified.
   from the component's own path segment name: `Output*`/`Input*` on buildings
   are authoritative; ambiguous belt/pipe endpoints (`ConveyorAny*`,
   `PipelineConnection*`, `SnapOnly*`, `Connection*`) fall back to an
-  index-parity guess (trailing digit `0` = inbound, `>=1` = outbound). This
-  heuristic is **unvalidated against ground truth** — do this before trusting
-  `FEEDS`/`SUPPLIES` direction for anything: pick one machine in-game whose
-  real inputs/outputs are known and confirm the graph agrees.
+  index-parity guess (trailing digit `0` = inbound, `>=1` = outbound).
+  **Structurally validated 2026-08-12** against a real save + local Neo4j:
+  miners (produce-only) show 0 incoming `FEEDS`; smelters/constructors show
+  ~1:1 in/out ratios matching real recipe topology. Not yet the literal
+  in-game eyeball check the original session called for — see
+  `docs/satisfactory.md` "Live Test Run" for the full numbers and what's
+  still open.
+- **178 duplicate `instanceName` rows observed in the `actors` extract**
+  against the real test save (mostly `BP_CreatureSpawner` / resource-node
+  actors) — `allSaveObjects()` appears to surface some actors from more than
+  one internal pool. Harmless: `MERGE` on `instanceName` collapses them to one
+  node (31,077 actual nodes vs. 31,255 extracted rows) — but worth knowing if
+  row counts vs. node counts ever look mismatched during debugging.
 - `satisfactory-save` writes some parser diagnostics (`[W] Unknown struct
   name "VehiclePathBlockReference"...`, malformed `mSpawnData` on
   `BP_CreatureSpawner` objects) directly to the process's stdout, not through
@@ -622,6 +639,32 @@ derived post-import, belts/pipes collapsed out), `ON_CIRCUIT` (`Actor`→`PowerC
 `HOLDS` (`Actor`→`Item`).
 
 ### Review Log
+
+**2026-08-12 (later)** — Live-tested the Satisfactory connector end-to-end against
+a real local Neo4j instance for the first time (`neo4j://127.0.0.1:7687`) with
+credentials and `SATISFACTORY_SAVE_PATH` supplied in `.env`. Fixed two things that
+blocked the run: `.env`'s save path was Windows-style and missing a `SaveGames`
+path segment (corrected to the real WSL `/mnt/c/...` path), and
+`config-satisfactory.yaml`'s header comment referenced a nonexistent `main.py run`
+subcommand (`main.py` is a single-command Typer app — no subcommand name). Ran
+constraints, a full import at `batch_size: 10`, then cleared the DB and re-ran at
+production batch size (1000 / 500 for `factory_links`) — byte-identical results
+both times (31,077 `Actor` nodes; 6,075 `FEEDS`, 1,785 `SUPPLIES`, 2,408
+`ON_CIRCUIT`, 1,708 `HOLDS` relationships), confirming batch size has no effect on
+correctness. Bumped `config-satisfactory.yaml` to those production batch sizes.
+Ran the post-import pass and did a structural (not literal in-game) validation of
+the `factory_links` direction heuristic: miners show 0 incoming `FEEDS` edges
+(correct — they only produce), smelters and constructors show ~1:1 in/out ratios
+matching real recipe topology — strong evidence the heuristic isn't systematically
+reversed. Found and documented a new benign quirk: 178 duplicate `instanceName`
+rows in the `actors` extract, correctly deduplicated by `MERGE`. Created
+`docs/satisfactory.md` as the single source of truth for this connector (setup,
+graph model, direction-heuristic explanation, full live-test numbers, Known
+Issues) — deliberately kept out of `README.md`/`ARCHITECTURE.md` since this is an
+internal/demo connector, not customer-facing. Both blockers from the earlier
+session entry remain: GPL-3 licensing is still undecided, and the literal in-game
+eyeball check for `factory_links` direction (session step 9) still hasn't been
+done — only the structural check above has.
 
 **2026-08-12** — Added Satisfactory save-game connector: `sources/satisfactory_source.py`
 (`SatisfactorySource`, one class / seven `extract` projections — `save`, `levels`,

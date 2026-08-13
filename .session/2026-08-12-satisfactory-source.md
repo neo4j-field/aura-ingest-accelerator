@@ -554,3 +554,33 @@ than `Constructor`.
   during this session (now reflected in `uv.lock`); it writes some parser
   diagnostics straight to stdout rather than through Python `logging` — see
   AGENTS.md Known Issues.
+
+### Follow-up: live Aura/Neo4j test run (same day, later)
+
+- Local Neo4j instance + real `.env` credentials + `SATISFACTORY_SAVE_PATH`
+  became available. Ran the full pipeline end-to-end for the first time:
+  constraints → import (batch_size 10, then production batch_size 1000/500
+  against a cleared DB — byte-identical results both times) → postimport pass.
+- Two bugs found and fixed in the process, neither in the connector itself:
+  `.env`'s save path was Windows-style and missing `SaveGames` (fixed to the
+  real WSL path), and `config-satisfactory.yaml`'s header comment referenced a
+  nonexistent `main.py run` subcommand (it's a single-command Typer app — no
+  subcommand name; corrected to `main.py --config ...`).
+- `factory_links` direction got a **structural** validation (not the literal
+  in-game eyeball check instruction #9 asked for): miners show 0 incoming
+  `FEEDS` (correct), smelters/constructors show ~1:1 in/out ratios matching
+  real recipe topology. Strong evidence, not proof — the literal check is
+  still open.
+- Found a new benign quirk: 178 duplicate `instanceName` rows in the `actors`
+  extract (mostly creature spawners / resource nodes), correctly collapsed by
+  `MERGE`. Documented, not fixed — no fix needed.
+- Bumped `config-satisfactory.yaml` to production batch sizes (1000, 500 for
+  `factory_links`) now that correctness is confirmed at both batch sizes.
+- Created `docs/satisfactory.md` as the connector's complete, self-contained
+  reference (setup, model, direction-heuristic explanation, full live-test
+  numbers, Known Issues) — kept out of `README.md`/`ARCHITECTURE.md` per
+  Paul's explicit request, since this is an internal/demo connector and not
+  something customers need to see.
+- Both blockers from the original PR remain open: GPL-3 licensing still needs
+  Paul's decision, and the literal in-game eyeball check for `factory_links`
+  direction still hasn't been done (only the structural check above has).
