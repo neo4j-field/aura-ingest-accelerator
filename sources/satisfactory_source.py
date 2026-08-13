@@ -8,6 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from sources.base import BaseSource
+from sources.class_names import normalise_class
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ class SatisfactorySource(BaseSource):
         "inventory_stacks",
         "factory_links",
         "power_links",
+        "machine_recipes",
     )
 
     def __init__(self, save_path: str, extract: str):
@@ -234,7 +236,9 @@ class SatisfactorySource(BaseSource):
                         continue
                     yield {
                         "ownerInstanceName": owner,
-                        "itemClass": item_class,
+                        # normalised to match Item.className from DocsSource —
+                        # see docs-enrichment session, class_names.normalise_class
+                        "itemClass": normalise_class(item_class),
                         "slotIndex": slot_index,
                         "count": num_items,
                     }
@@ -315,3 +319,30 @@ class SatisfactorySource(BaseSource):
                 if comp_path is None:
                     continue
                 yield {"instanceName": _owner_of(comp_path), "circuitId": circuit_id}
+
+    def _extract_machine_recipes(self, save):
+        """
+        The RUNS_RECIPE join edge to the DocsSource logical layer — see
+        .session/2026-08-12-docs-enrichment.md. Only manufacturer-style
+        buildings (Constructor, Assembler, Manufacturer, Refinery, Blender,
+        Foundry, Packager, ...) carry mCurrentRecipe; miners/extractors don't
+        (they auto-extract with no recipe) and are silently skipped.
+        """
+        for o in save.allSaveObjects():
+            if o.Object is None:
+                continue
+            recipe_path = None
+            clock_speed = None
+            for p in o.Object.Properties:
+                name = p.Name.toString()
+                if name == "mCurrentRecipe":
+                    recipe_path = getattr(p.Value, "PathName", None)
+                elif name == "mCurrentPotential":
+                    clock_speed = float(p.Value)
+            if recipe_path is None:
+                continue
+            yield {
+                "instanceName": o.BaseHeader.Reference.PathName,
+                "recipeClassName": normalise_class(recipe_path),
+                "clockSpeed": clock_speed,
+            }

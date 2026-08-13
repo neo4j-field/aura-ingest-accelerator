@@ -11,6 +11,7 @@ from sources.bigquery_source import BigQuerySource
 from sources.gcs_source import GCSSource
 from sources.databricks_source import DatabricksSource
 from sources.satisfactory_source import SatisfactorySource
+from sources.docs_source import DocsSource
 
 # =============================================================================
 # CLI & Logging Setup
@@ -67,13 +68,15 @@ def build_source(cfg: dict):
         return DatabricksSource(cfg["query"])
     elif source_type == "satisfactory":
         return SatisfactorySource(cfg["save_path"], cfg["extract"])
+    elif source_type == "satisfactory_docs":
+        return DocsSource(cfg["docs_path"], cfg["extract"])
     elif source_type == "mock" and os.getenv("AURA_TEST_MODE"):
         from sources.mock import MockSource
         return MockSource(cfg.get("rows", []))
     else:
         raise ValueError(
             f"Unknown source type '{source_type}'. "
-            f"Valid options: bigquery, gcs, databricks, satisfactory"
+            f"Valid options: bigquery, gcs, databricks, satisfactory, satisfactory_docs"
         )
 
 

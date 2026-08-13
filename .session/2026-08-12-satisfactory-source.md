@@ -1,5 +1,5 @@
 ---
-Status: active
+Status: complete
 Date: 2026-08-12
 Topic: satisfactory-source
 ---
