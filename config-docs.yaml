@@ -1,0 +1,162 @@
+# config-docs.yaml
+# =============================================================================
+# Satisfactory Docs.json Enrichment — the logical (class/recipe) layer
+# =============================================================================
+# Loads Satisfactory's shipped game-data dump (en-US.json) and joins it to the
+# physical (instance) graph already imported by config-satisfactory.yaml.
+# Run cypher/satisfactory_constraints.cypher (already extended with the
+# Recipe/Schematic constraints) BEFORE the first run of this file, and
+# cypher/satisfactory_postimport.cypher AFTER the last job below completes.
+#
+# Requires config-satisfactory.yaml to have already been imported at least
+# once — recipe_ingredients/recipe_products MATCH onto :Item nodes created by
+# that import (their className was migrated from full save paths to short
+# class names during this session — see AGENTS.md Project-Specific), and the
+# final "Machine Recipes" job MATCHes onto :Actor nodes from it.
+#
+# Jobs 1-8 are ordered by dependency (items/recipes/schematics before the
+# edges that reference them). The final job is save-side, not docs-side — it
+# reads SatisfactorySource's new `machine_recipes` extract (mCurrentRecipe on
+# each manufacturer instance) to create the RUNS_RECIPE join edge between the
+# physical and logical layers.
+#
+# Run with (no "run" subcommand — main.py is a single-command Typer app):
+#   uv run python main.py --config config-docs.yaml --debug
+#
+# SATISFACTORY_DOCS_PATH / SATISFACTORY_SAVE_PATH are read from .env.
+#
+# batch_size: 10 — first-run validation setting. Row counts here are modest
+# (largest extract is ~1000 rows) so there's little reason to raise this much
+# further even for production use, unlike config-satisfactory.yaml's
+# 1000/500.
+# =============================================================================
+
+imports:
+
+  - name: "Items"
+    source: satisfactory_docs
+    docs_path: "${SATISFACTORY_DOCS_PATH}"
+    extract: items
+    cypher: |
+      UNWIND $rows AS row
+      WITH row, datetime() AS now
+      MERGE (i:Item {className: row.className})
+      ON CREATE SET i.createdEpochMillis = now.epochMillis,
+                    i.createdDatetime    = now
+      ON MATCH SET  i.modifiedEpochMillis = now.epochMillis,
+                    i.modifiedDatetime    = now
+      SET i.displayName = row.displayName,
+          i.description = row.description,
+          i.form = row.form,
+          i.category = row.category,
+          i.stackSize = row.stackSize,
+          i.sinkPoints = row.sinkPoints,
+          i.energyValue = row.energyValue
+    batch_size: 10
+
+  - name: "Buildables"
+    source: satisfactory_docs
+    docs_path: "${SATISFACTORY_DOCS_PATH}"
+    extract: buildables
+    cypher: |
+      UNWIND $rows AS row
+      WITH row, datetime() AS now
+      MERGE (c:Class {shortName: row.className})
+      ON CREATE SET c.createdEpochMillis = now.epochMillis,
+                    c.createdDatetime    = now
+      ON MATCH SET  c.modifiedEpochMillis = now.epochMillis,
+                    c.modifiedDatetime    = now
+      SET c.displayName = row.displayName,
+          c.description = row.description,
+          c.powerConsumption = row.powerConsumption,
+          c.powerConsumptionExponent = row.powerConsumptionExponent,
+          c.manufacturingSpeed = row.manufacturingSpeed
+    batch_size: 10
+
+  - name: "Recipes"
+    source: satisfactory_docs
+    docs_path: "${SATISFACTORY_DOCS_PATH}"
+    extract: recipes
+    cypher: |
+      UNWIND $rows AS row
+      WITH row, datetime() AS now
+      MERGE (r:Recipe {className: row.className})
+      ON CREATE SET r.createdEpochMillis = now.epochMillis,
+                    r.createdDatetime    = now
+      SET r.displayName = row.displayName,
+          r.durationSeconds = row.durationSeconds,
+          r.isAlternate = row.isAlternate
+    batch_size: 10
+
+  - name: "Recipe Ingredients"
+    source: satisfactory_docs
+    docs_path: "${SATISFACTORY_DOCS_PATH}"
+    extract: recipe_ingredients
+    cypher: |
+      UNWIND $rows AS row
+      MATCH (r:Recipe {className: row.recipeClassName})
+      MATCH (i:Item {className: row.itemClassName})
+      MERGE (r)-[c:CONSUMES]->(i)
+      ON CREATE SET c.amount = row.amount
+    batch_size: 10
+
+  - name: "Recipe Products"
+    source: satisfactory_docs
+    docs_path: "${SATISFACTORY_DOCS_PATH}"
+    extract: recipe_products
+    cypher: |
+      UNWIND $rows AS row
+      MATCH (r:Recipe {className: row.recipeClassName})
+      MATCH (i:Item {className: row.itemClassName})
+      MERGE (r)-[c:PRODUCES]->(i)
+      ON CREATE SET c.amount = row.amount
+    batch_size: 10
+
+  - name: "Recipe Machines"
+    source: satisfactory_docs
+    docs_path: "${SATISFACTORY_DOCS_PATH}"
+    extract: recipe_machines
+    cypher: |
+      UNWIND $rows AS row
+      MATCH (r:Recipe {className: row.recipeClassName})
+      MATCH (c:Class {shortName: row.buildableClassName})
+      MERGE (r)-[:PRODUCIBLE_IN]->(c)
+    batch_size: 10
+
+  - name: "Schematics"
+    source: satisfactory_docs
+    docs_path: "${SATISFACTORY_DOCS_PATH}"
+    extract: schematics
+    cypher: |
+      UNWIND $rows AS row
+      WITH row, datetime() AS now
+      MERGE (s:Schematic {className: row.className})
+      ON CREATE SET s.createdEpochMillis = now.epochMillis,
+                    s.createdDatetime    = now
+      SET s.displayName = row.displayName,
+          s.tier = row.tier,
+          s.type = row.type
+    batch_size: 10
+
+  - name: "Schematic Unlocks"
+    source: satisfactory_docs
+    docs_path: "${SATISFACTORY_DOCS_PATH}"
+    extract: schematic_unlocks
+    cypher: |
+      UNWIND $rows AS row
+      MATCH (s:Schematic {className: row.schematicClassName})
+      MATCH (r:Recipe {className: row.recipeClassName})
+      MERGE (s)-[:UNLOCKS]->(r)
+    batch_size: 10
+
+  - name: "Machine Recipes"
+    source: satisfactory
+    save_path: "${SATISFACTORY_SAVE_PATH}"
+    extract: machine_recipes
+    cypher: |
+      UNWIND $rows AS row
+      MATCH (a:Actor {instanceName: row.instanceName})
+      MATCH (r:Recipe {className: row.recipeClassName})
+      MERGE (a)-[run:RUNS_RECIPE]->(r)
+      SET run.clockSpeed = row.clockSpeed
+    batch_size: 10

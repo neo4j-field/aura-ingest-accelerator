@@ -35,6 +35,11 @@ hmac = [
 databricks = [
     "databricks-sql-connector>=3.0.0"
 ]
+# GPL-3.0 dependency — see AGENTS.md "Satisfactory connector" Known Issues
+# for the licensing question this raises for aura-ingest-accelerator.
+satisfactory = [
+    "satisfactory-save>=0.11.0"
+]
 
 [project.scripts]
 # Uncomment after defining your CLI entry point:
