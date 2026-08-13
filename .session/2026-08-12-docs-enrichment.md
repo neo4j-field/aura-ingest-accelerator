@@ -1,5 +1,5 @@
 ---
-Status: active
+Status: complete
 Date: 2026-08-12
 Topic: docs-enrichment
 ---
@@ -404,3 +404,9 @@ If this returns rows against Paul's real save, the session is done.
   `_extract_inventory_stacks()` fixed to normalise going forward so future imports don't
   regress it. Not explicitly called for by the session spec, but necessary for every
   `:Item`-touching join edge to work at all.
+
+- **In-game spot-check confirmed (2026-08-13).** Paul checked
+  `Build_ConstructorMk1_C_2146938608` in-game against the candidate handed off at session
+  close: Iron Plate recipe at 75% clock, matching the graph exactly. Closes out the literal
+  ground-truth check both Satisfactory connectors (this one and the `.sav` connector's
+  `factory_links` direction heuristic) had deferred since their first sessions.

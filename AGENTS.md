@@ -577,15 +577,6 @@ resource-node-identity scope change (see Known Issues) are in
   batch_size 10 and at production batch_size, postimport pass). Still not run
   against an actual Aura endpoint — expect materially different timing from
   network round-trips per batch. See `docs/satisfactory.md`.
-- Do the literal in-game eyeball check for `factory_links` direction (session
-  step 9): pick one machine in Paul's save whose real inputs/outputs are known,
-  confirm the graph agrees. 2026-08-12's structural/class-level check (miners
-  show 0 incoming `FEEDS`, smelters/constructors ~1:1 in/out) is strong
-  evidence but isn't that literal check — see `docs/satisfactory.md`. A
-  concrete candidate was handed to Paul during the docs-enrichment session
-  (`Build_ConstructorMk1_C_2146938608`, 75% clock, Iron Plate recipe) — one
-  spot-check would close out both connectors' deferred ground-truth
-  validation at once.
 - GPL-3 licensing decision (see Known Issues) blocks merging this branch past a
   feature branch — do not merge to `develop` or `main` until resolved. Applies
   to `SatisfactorySource` only; `DocsSource` has no such dependency.
@@ -632,10 +623,9 @@ resource-node-identity scope change (see Known Issues) are in
   index-parity guess (trailing digit `0` = inbound, `>=1` = outbound).
   **Structurally validated 2026-08-12** against a real save + local Neo4j:
   miners (produce-only) show 0 incoming `FEEDS`; smelters/constructors show
-  ~1:1 in/out ratios matching real recipe topology. Not yet the literal
-  in-game eyeball check the original session called for — see
-  `docs/satisfactory.md` "Live Test Run" for the full numbers and what's
-  still open.
+  ~1:1 in/out ratios matching real recipe topology. **Confirmed with the
+  literal in-game eyeball check 2026-08-13** — see `docs/satisfactory.md`
+  "Live Test Run" for the full numbers.
 - **178 duplicate `instanceName` rows observed in the `actors` extract**
   against the real test save (mostly `BP_CreatureSpawner` / resource-node
   actors) — `allSaveObjects()` appears to surface some actors from more than
@@ -712,7 +702,8 @@ independent overlay (can co-occur with `:RawResource` — Crude Oil, Water).
 
 **Relationship types:** `HAS_LEVEL` (`Save`→`Level`), `CONTAINS` (`Level`→`Actor`),
 `INSTANCE_OF` (`Actor`→`Class`), `FEEDS` (`Actor`→`Actor`, raw per-hop belt/pipe
-chain — direction unvalidated, see Known Issues), `SUPPLIES` (`Machine`→`Machine`,
+chain — direction heuristic, confirmed both structurally and in-game, see
+Known Issues), `SUPPLIES` (`Machine`→`Machine`,
 derived post-import, belts/pipes collapsed out), `ON_CIRCUIT` (`Actor`→`PowerCircuit`),
 `HOLDS` (`Actor`→`Item`), `CONSUMES` (`Recipe`→`Item`, `{amount}`), `PRODUCES`
 (`Recipe`→`Item`, `{amount}`), `PRODUCIBLE_IN` (`Recipe`→`Class`), `UNLOCKS`
@@ -753,10 +744,13 @@ extracted-row-counts and `relationships_created` (`PRODUCIBLE_IN` 444→291,
 `UNLOCKS` 1016→339) were traced to expected causes (workbench/workshop
 aren't `FGBuildable*` classes; excluded building-construction recipes),
 not bugs. Full numbers and the "Docs.json Enrichment" reference section are
-in `docs/satisfactory.md`. Deferred: the literal in-game spot-check (a
-concrete candidate — `Build_ConstructorMk1_C_2146938608`, 75% clock, Iron
-Plate — was handed to Paul but not yet confirmed), and everything the
-`resource_node_yields` scope change punted on.
+in `docs/satisfactory.md`. **2026-08-13 update:** the in-game spot-check
+candidate (`Build_ConstructorMk1_C_2146938608`) was confirmed against the
+real game UI — Iron Plate recipe at 75% clock, matching the graph exactly.
+This closes out the literal ground-truth check both Satisfactory connectors
+had deferred since their first session (see `factory_links` in Known Issues
+above). Still deferred: everything the `resource_node_yields` scope change
+punted on, GPL-3 licensing, and a live run against an actual Aura endpoint.
 
 **2026-08-12 (later)** — Live-tested the Satisfactory connector end-to-end against
 a real local Neo4j instance for the first time (`neo4j://127.0.0.1:7687`) with

@@ -11,8 +11,8 @@ lists) — which makes it a good teaching artifact. See the "Welcome to Graphs"
 notebook idea in `.session/2026-08-12-satisfactory-source.md` for where this is
 headed.
 
-**Do not merge this connector's branch to `develop` or `main` until the two
-blockers below are resolved.** See the PR: https://github.com/neo4j-field/aura-ingest-accelerator/pull/1
+**Do not merge this connector's branch to `develop` or `main` until the
+remaining blocker below is resolved.** See the PR: https://github.com/neo4j-field/aura-ingest-accelerator/pull/1
 
 ---
 
@@ -28,11 +28,13 @@ blockers below are resolved.** See the PR: https://github.com/neo4j-field/aura-i
    call, not something this connector can resolve on its own. This blocker is
    specific to the `.sav`-parsing half (`SatisfactorySource`) — `DocsSource`
    (below) needs no third-party parser at all and carries no such issue.
-2. ~~`factory_links` direction is unvalidated.~~ **Structurally validated
-   2026-08-12** — see [Live Test Run](#live-test-run-2026-08-12) below. Not a
-   literal in-game eyeball check (the session's original instruction #9), but
-   class-level topology checks that would have caught a systematically wrong
-   heuristic did not find one.
+2. ~~`factory_links` direction is unvalidated.~~ **Resolved.** Structurally
+   validated 2026-08-12 (see [Live Test Run](#live-test-run-2026-08-12)
+   below), then confirmed with the literal in-game eyeball check the
+   original session called for: the spot-check candidate handed off during
+   the docs-enrichment session (`Build_ConstructorMk1_C_2146938608`) was
+   confirmed against the actual game UI — Iron Plate recipe at 75% clock,
+   matching the graph exactly.
 
 ---
 
@@ -231,8 +233,11 @@ machine in Paul's own game and eyeballing its real inputs/outputs), but it's
 strong evidence the heuristic is directionally sound for the common
 building↔belt case, which is the majority of the graph.
 
-**Not yet done:** the literal in-game eyeball check against one specific
-machine. **No live check against an actual Aura instance** (only local
+**Update:** the literal in-game eyeball check was done during the
+docs-enrichment session — see [Docs.json Enrichment](#docsjson-enrichment-2026-08-12)
+below. Confirmed, not just structurally consistent.
+
+**No live check against an actual Aura instance** (only local
 Neo4j) — expect materially different timing due to network round-trips per
 batch; consider raising `batch_size` further or increasing
 `Neo4jImporter`'s `max_retries` (default 0) for a real Aura run.
@@ -507,13 +512,12 @@ displayName to inherit, hence the sanity-check number below).
 (`SUPPLIES`) and logical (`RUNS_RECIPE`→`PRODUCES`) layers connect through a
 real multi-hop path in Paul's actual factory.
 
-**In-game spot-check — not yet done.** Needs Paul's own eyes on the game,
-not something verifiable from the graph alone. A concrete candidate handed
-off for this: `Build_ConstructorMk1_C_2146938608` at world position
-`(303800, -170500, 6200)`, graph says `Iron Plate` recipe at 75% clock
-(3 Iron Ingot → 2 Iron Plate). Confirming this (or any similarly overclocked
-machine) against the in-game UI would close out the literal ground-truth
-check this connector has deferred since its first session.
+**In-game spot-check — confirmed.** `Build_ConstructorMk1_C_2146938608` at
+world position `(303800, -170500, 6200)` checked against the actual game UI:
+Iron Plate recipe at 75% clock (3 Iron Ingot → 2 Iron Plate), exactly
+matching the graph. This closes out the literal ground-truth check both
+Satisfactory connectors had deferred since the first session — see Blocker 2
+above.
 
 ## Known Issues
 
